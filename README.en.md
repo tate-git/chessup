@@ -39,8 +39,6 @@ npm test                    # engine and rating tests
 API_BASE=http://localhost:8787 npm run test:api   # server contract tests
 ```
 
-## Copyright
+## Third-party
 
-Code © tate-git. All rights reserved. No license is granted, so any use beyond viewing (copying, modifying, distributing) needs permission.
-
-The piece images (`public/piece`) are by Colin M.L. Burnett, used under the BSD option of the author's license choice (BSD / GPL / CC BY-SA 3.0).
+- Chess piece images (`public/piece`): [Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett) (Wikimedia Commons) — 3-clause BSD License, full text in [`public/piece/LICENSE`](public/piece/LICENSE)

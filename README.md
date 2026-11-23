@@ -39,8 +39,6 @@ npm test                    # 엔진·레이팅 시험
 API_BASE=http://localhost:8787 npm run test:api   # 서버 약속 시험
 ```
 
-## 저작권
+## 빌려 쓴 것
 
-코드 © tate-git. All rights reserved — 라이선스를 따로 주지 않았으므로 보는 것 외의 사용(복제·수정·배포)은 허락이 필요합니다.
-
-말 그림(`public/piece`)은 Colin M.L. Burnett 의 작품으로, 원작자가 정한 라이선스(BSD / GPL / CC BY-SA 3.0 중 선택) 중 BSD 조건으로 사용합니다.
+- 체스 말 그림(`public/piece`): [Cburnett](https://commons.wikimedia.org/wiki/User:Cburnett) (Wikimedia Commons) — 3조항 BSD 라이선스, 전문은 [`public/piece/LICENSE`](public/piece/LICENSE)
