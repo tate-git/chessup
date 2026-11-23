@@ -1,0 +1,269 @@
+// 대국방(Durable Object · 대국 하나에 하나): 수 검사 · 시계 · 무승부 제안 · 끝나면 레이팅 반영 · 접속한 모두에게 알림
+import { DurableObject } from 'cloudflare:workers';
+import { Game, type EndReason as EngineEndReason } from '../../engine/game';
+import { parseTimeControl, type Clocks, type Color, type EndReason, type GameClientMessage, type GameResult, type GameServerMessage, type GameSummary, type LiveGame, type TimeControl } from '../../shared/protocol';
+import type { VariantId } from '../../engine/variants';
+import { insertGameStatement } from '../db/games';
+import { loadRating, saveRatingStatement, type RatingRow } from '../db/ratings';
+import type { Env } from '../env';
+import { updateRating } from '../rating/glicko2';
+import { clocksAfterMove, colorToMove, liveClocks, nextDeadline } from './clock';
+
+export interface SeatedPlayer {
+  readonly id: string;
+  readonly username: string;
+}
+
+export interface GameSetup {
+  readonly id: string;
+  readonly variant: VariantId;
+  readonly timeControl: TimeControl;
+  readonly white: SeatedPlayer;
+  readonly black: SeatedPlayer;
+}
+
+interface PlayerState extends SeatedPlayer {
+  readonly rating: RatingRow;
+}
+
+interface StoredGame {
+  readonly id: string;
+  readonly variant: VariantId;
+  readonly timeControl: TimeControl;
+  readonly white: PlayerState;
+  readonly black: PlayerState;
+  readonly moves: string[];
+  clocks: Clocks;
+  turnStartedAt: number;
+  drawOfferBy?: Color;
+  readonly startedAt: string;
+  ended?: GameSummary;
+}
+
+type Seat = Color | 'spectator';
+const STORAGE_KEY = 'game';
+
+export class GameRoom extends DurableObject<Env> {
+  #game: StoredGame | null = null;
+
+  /** 로비가 짝을 지으면 부름 */
+  async start(setup: GameSetup): Promise<void> {
+    const [white, black] = await Promise.all([
+      loadRating(this.env.DB, setup.white.id, setup.variant),
+      loadRating(this.env.DB, setup.black.id, setup.variant),
+    ]);
+    const { initialMs } = parseTimeControl(setup.timeControl);
+    const game: StoredGame = {
+      ...setup,
+      white: { ...setup.white, rating: white },
+      black: { ...setup.black, rating: black },
+      moves: [],
+      clocks: { white: initialMs, black: initialMs },
+      turnStartedAt: Date.now(),
+      startedAt: new Date().toISOString(),
+    };
+    await this.#save(game);
+  }
+
+  /** WebSocket 접속(Worker 가 X-User-Id 를 붙여 보냄 — 없으면 관전) */
+  override async fetch(request: Request): Promise<Response> {
+    const game = await this.#load();
+    if (!game) return Response.json({ error: { code: 'not_found', message: '대국을 찾을 수 없어요' } }, { status: 404 });
+    const { 0: client, 1: server } = new WebSocketPair();
+    const seat = seatOf(game, request.headers.get('X-User-Id'));
+    this.ctx.acceptWebSocket(server, [seat]);
+    send(server, { type: 'state', game: this.#liveView(game, seat) });
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  override async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    const game = await this.#load();
+    const seat = this.ctx.getTags(socket)[0] as Seat;
+    if (!game || seat === 'spectator' || typeof raw !== 'string') return;
+    if (game.ended) return send(socket, errorMessage('game_over', '이미 끝난 대국이에요'));
+
+    const message = parseMessage(raw);
+    if (!message) return send(socket, errorMessage('invalid_input', '알 수 없는 글'));
+    switch (message.type) {
+      case 'move': return this.#move(game, seat, socket, message.uci, message.ply);
+      case 'resign': return this.#finish(game, seat === 'white' ? '0-1' : '1-0', 'resign');
+      case 'offerDraw': return this.#offerDraw(game, seat);
+      case 'acceptDraw': return game.drawOfferBy && game.drawOfferBy !== seat ? this.#finish(game, '1/2-1/2', 'agreement') : undefined;
+      case 'declineDraw': return this.#clearDrawOffer(game, seat);
+    }
+  }
+
+  /** 시간 초과 · 첫 수 제한 */
+  override async alarm(): Promise<void> {
+    const game = await this.#load();
+    if (!game || game.ended) return;
+    const ply = game.moves.length;
+    if (ply < 2) return this.#finish(game, '1/2-1/2', 'abandon');
+    const loser = colorToMove(ply);
+    if (liveClocks(game.clocks, ply, game.turnStartedAt, Date.now())[loser] > 0) return this.#scheduleDeadline(game);
+    return this.#finish(game, loser === 'white' ? '0-1' : '1-0', 'timeout');
+  }
+
+  async #move(game: StoredGame, seat: Color, socket: WebSocket, uci: string, ply: number): Promise<void> {
+    if (ply !== game.moves.length) return;   // 늦게 온 중복 글
+    if (colorToMove(ply) !== seat) return send(socket, errorMessage('not_your_turn', '상대 차례예요'));
+    const board = replay(game);
+    const move = board.findMove(uci);
+    if (!move) return send(socket, errorMessage('illegal_move', '둘 수 없는 수예요'));
+
+    const now = Date.now();
+    const { incrementMs } = parseTimeControl(game.timeControl);
+    const clocks = clocksAfterMove(game.clocks, ply, game.turnStartedAt, now, incrementMs);
+    if (clocks[seat] <= 0 && ply >= 2) return this.#finish(game, seat === 'white' ? '0-1' : '1-0', 'timeout');
+
+    const played = board.play(move);
+    game.moves.push(played.uci);
+    game.clocks = clocks;
+    game.turnStartedAt = now;
+    if (game.drawOfferBy && game.drawOfferBy !== seat) game.drawOfferBy = undefined;   // 수를 두면 받은 제안은 거절한 셈
+    await this.#save(game);
+    this.#broadcast({ type: 'move', uci: played.uci, san: played.san, ply, clocks });
+
+    const status = board.status();
+    if (status.over) return this.#finish(game, status.result, toEndReason(status.reason));
+    await this.#scheduleDeadline(game);
+  }
+
+  async #offerDraw(game: StoredGame, seat: Color): Promise<void> {
+    if (game.drawOfferBy) return game.drawOfferBy !== seat ? this.#finish(game, '1/2-1/2', 'agreement') : undefined;
+    game.drawOfferBy = seat;
+    await this.#save(game);
+    this.#broadcast({ type: 'drawOffered', by: seat });
+  }
+
+  async #clearDrawOffer(game: StoredGame, seat: Color): Promise<void> {
+    if (!game.drawOfferBy || game.drawOfferBy === seat) return;
+    game.drawOfferBy = undefined;
+    await this.#save(game);
+    this.#broadcast({ type: 'state', game: this.#liveView(game, 'spectator') });
+  }
+
+  /** 끝: 레이팅 계산 · DB 저장(취소된 판은 저장 안 함) · 모두에게 알림 */
+  async #finish(game: StoredGame, result: GameResult, reason: EndReason): Promise<void> {
+    const rated = reason !== 'abandon';
+    const [whiteAfter, blackAfter] = rated ? rateGame(game.white.rating, game.black.rating, result) : [game.white.rating, game.black.rating];
+    const endedAt = new Date().toISOString();
+    const change = (before: RatingRow, after: RatingRow) => Math.round(after.rating) - Math.round(before.rating);
+    const summary: GameSummary = {
+      id: game.id,
+      variant: game.variant,
+      timeControl: game.timeControl,
+      white: { username: game.white.username, rating: Math.round(game.white.rating.rating), ratingChange: change(game.white.rating, whiteAfter) },
+      black: { username: game.black.username, rating: Math.round(game.black.rating.rating), ratingChange: change(game.black.rating, blackAfter) },
+      result,
+      reason,
+      endedAt,
+    };
+
+    if (rated) {
+      const db = this.env.DB;
+      await db.batch([
+        insertGameStatement(db, {
+          id: game.id, variant: game.variant, time_control: game.timeControl, white_id: game.white.id, black_id: game.black.id,
+          result, reason, moves: game.moves.join(' '),
+          white_rating: summary.white.rating, black_rating: summary.black.rating,
+          white_change: summary.white.ratingChange ?? 0, black_change: summary.black.ratingChange ?? 0,
+          started_at: game.startedAt, ended_at: endedAt,
+        }),
+        saveRatingStatement(db, game.white.id, whiteAfter),
+        saveRatingStatement(db, game.black.id, blackAfter),
+      ]);
+    }
+    game.ended = summary;
+    await this.#save(game);
+    await this.ctx.storage.deleteAlarm();
+    this.#broadcast({ type: 'end', game: summary });
+  }
+
+  #scheduleDeadline(game: StoredGame): Promise<void> {
+    return this.ctx.storage.setAlarm(nextDeadline(game.clocks, game.moves.length, game.turnStartedAt));
+  }
+
+  #liveView(game: StoredGame, seat: Seat): LiveGame {
+    const player = (state: PlayerState) => ({ username: state.username, rating: Math.round(state.rating.rating) });
+    return {
+      id: game.id,
+      variant: game.variant,
+      timeControl: game.timeControl,
+      white: player(game.white),
+      black: player(game.black),
+      moves: game.moves,
+      clocks: liveClocks(game.clocks, game.moves.length, game.turnStartedAt, Date.now()),
+      you: seat,
+      drawOfferBy: game.drawOfferBy,
+    };
+  }
+
+  #broadcast(message: GameServerMessage): void {
+    for (const socket of this.ctx.getWebSockets()) {
+      const seat = this.ctx.getTags(socket)[0] as Seat;
+      send(socket, message.type === 'state' ? { ...message, game: { ...message.game, you: seat } } : message);
+    }
+  }
+
+  async #load(): Promise<StoredGame | null> {
+    this.#game ??= (await this.ctx.storage.get<StoredGame>(STORAGE_KEY)) ?? null;
+    return this.#game;
+  }
+
+  async #save(game: StoredGame): Promise<void> {
+    this.#game = game;
+    await this.ctx.storage.put(STORAGE_KEY, game);
+    if (game.moves.length === 0 && !game.ended) await this.#scheduleDeadline(game);
+  }
+}
+
+function seatOf(game: StoredGame, userId: string | null): Seat {
+  if (userId === game.white.id) return 'white';
+  if (userId === game.black.id) return 'black';
+  return 'spectator';
+}
+
+function replay(game: StoredGame): Game {
+  const board = new Game(game.variant);
+  for (const uci of game.moves) board.playUci(uci);
+  return board;
+}
+
+function rateGame(white: RatingRow, black: RatingRow, result: GameResult): [RatingRow, RatingRow] {
+  const whiteScore = result === '1-0' ? 1 : result === '0-1' ? 0 : 0.5;
+  return [tally(white, black, whiteScore), tally(black, white, 1 - whiteScore)];
+}
+
+/** 대국 하나 반영: 새 레이팅 + 전적 */
+function tally(player: RatingRow, opponent: RatingRow, score: number): RatingRow {
+  return {
+    ...player,
+    ...updateRating(player, [{ opponent, score }]),
+    games: player.games + 1,
+    wins: player.wins + (score === 1 ? 1 : 0),
+    losses: player.losses + (score === 0 ? 1 : 0),
+    draws: player.draws + (score === 0.5 ? 1 : 0),
+  };
+}
+
+const toEndReason = (reason: EngineEndReason): EndReason => reason;
+
+function parseMessage(raw: string): GameClientMessage | null {
+  try {
+    const message = JSON.parse(raw) as GameClientMessage;
+    return typeof message?.type === 'string' ? message : null;
+  } catch {
+    return null;
+  }
+}
+
+const errorMessage = (code: Extract<GameServerMessage, { type: 'error' }>['code'], message: string): GameServerMessage => ({ type: 'error', code, message });
+
+function send(socket: WebSocket, message: GameServerMessage): void {
+  try {
+    socket.send(JSON.stringify(message));
+  } catch {
+    // 끊긴 연결 — 다시 접속하면 state 로 따라잡음
+  }
+}

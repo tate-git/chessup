@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: Chessup API
+  version: 0.1.0
+  description: |
+    체스업 서버 약속. Cloudflare(TypeScript) 서버와 Spring Boot(Java) 서버가 똑같이 따른다.
+
+    - 인증: 로그인하면 `sid` 쿠키(HttpOnly · Secure · SameSite=Lax · 30일)를 준다. 쿠키가 필요한 곳은 `security: cookieAuth`.
+    - 오류는 언제나 `{ "error": { "code", "message" } }` 꼴(`ErrorBody`).
+    - 실시간 대국은 WebSocket(`/api/lobby`, `/api/games/{id}/live`)으로, 주고받는 글은 아래 `LobbyClientMessage` 등 스키마.
+    - 레이팅: Glicko-2(처음 1500 · RD 350 · 변동성 0.06), 종목(standard·mini)마다 따로. 사람 대국만 반영(봇은 연습).
+servers:
+  - url: /
+tags:
+  - name: auth
+  - name: users
+  - name: practice
+  - name: games
+  - name: live
+
+paths:
+  /api/auth/signup:
+    post:
+      tags: [auth]
+      summary: 회원가입(바로 로그인됨)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '201':
+          description: 가입 완료 · `sid` 쿠키 발급
+          headers: { Set-Cookie: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } }
+        '400': { $ref: '#/components/responses/InvalidInput' }
+        '409': { $ref: '#/components/responses/UsernameTaken' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: 로그인
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '200':
+          description: 로그인 · `sid` 쿠키 발급
+          headers: { Set-Cookie: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: 로그아웃(세션 삭제 · 쿠키 만료)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '204': { description: 로그아웃 }
+
+  /api/me:
+    get:
+      tags: [users]
+      summary: 내 정보
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: 내 정보, content: { application/json: { schema: { $ref: '#/components/schemas/Me' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/users/{username}:
+    get:
+      tags: [users]
+      summary: 남의 프로필(레이팅 · 최근 대국)
+      parameters:
+        - { name: username, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 프로필, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/leaderboard:
+    get:
+      tags: [users]
+      summary: 랭킹(레이팅 높은 순 · 10판 이상 둔 사람만)
+      parameters:
+        - { name: variant, in: query, required: true, schema: { $ref: '#/components/schemas/VariantId' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: 랭킹
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [variant, entries]
+                properties:
+                  variant: { $ref: '#/components/schemas/VariantId' }
+                  entries: { type: array, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+
+  /api/practice:
+    get:
+      tags: [practice]
+      summary: 봇 연습 기록 · 남은 힌트
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: 연습 기록, content: { application/json: { schema: { $ref: '#/components/schemas/PracticeState' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/practice/clears:
+    post:
+      tags: [practice]
+      summary: 봇 단계 격파 기록(연습용 · 레이팅과 무관)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant, level]
+              properties:
+                variant: { $ref: '#/components/schemas/VariantId' }
+                level: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        '200': { description: 갱신된 기록, content: { application/json: { schema: { $ref: '#/components/schemas/PracticeState' } } } }
+        '400': { $ref: '#/components/responses/InvalidInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/practice/hints:
+    post:
+      tags: [practice]
+      summary: 힌트 한 번 쓰기(초보 = 사람 대국 20판 미만 → 한 판 1번 · 그 외 하루 1번(한국 시간))
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [practiceGameId]
+              properties:
+                practiceGameId: { type: string, description: 화면이 만든 연습 판 id(초보 한 판 1번 세기용), maxLength: 64 }
+      responses:
+        '200': { description: 사용 · 남은 수, content: { application/json: { schema: { $ref: '#/components/schemas/HintAllowance' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { description: 남은 힌트 없음, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+
+  /api/games/{id}:
+    get:
+      tags: [games]
+      summary: 끝난 대국 기록
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 대국, content: { application/json: { schema: { $ref: '#/components/schemas/GameRecord' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/lobby:
+    get:
+      tags: [live]
+      summary: 매칭 WebSocket(Upgrade) — 보낼 글 LobbyClientMessage · 받을 글 LobbyServerMessage
+      security: [{ cookieAuth: [] }]
+      responses:
+        '101': { description: WebSocket 연결 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/games/{id}/live:
+    get:
+      tags: [live]
+      summary: 대국 WebSocket(Upgrade) — 보낼 글 GameClientMessage · 받을 글 GameServerMessage · 두 사람이 아니면 관전
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '101': { description: WebSocket 연결 }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    cookieAuth: { type: apiKey, in: cookie, name: sid }
+
+  responses:
+    InvalidInput: { description: 입력 오류(invalid_input), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+    UsernameTaken: { description: 이미 있는 아이디(username_taken), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+    InvalidCredentials: { description: 아이디·비밀번호 틀림(invalid_credentials), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+    Unauthorized: { description: 로그인 필요(unauthorized), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+    NotFound: { description: 없음(not_found), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+    RateLimited: { description: 시도가 너무 많음(rate_limited) · 잠시 뒤 다시, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+
+  schemas:
+    ErrorCode:
+      type: string
+      enum: [invalid_input, username_taken, invalid_credentials, unauthorized, not_found, rate_limited, no_hints_left, illegal_move, not_your_turn, game_over]
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { $ref: '#/components/schemas/ErrorCode' }
+            message: { type: string }
+
+    VariantId: { type: string, enum: [standard, mini] }
+    TimeControl:
+      type: string
+      description: '「분+초」 — standard: 3+2 · 5+3 · 10+0 / mini: 2+1 · 3+2'
+      enum: ['3+2', '5+3', '10+0', '2+1']
+    Color: { type: string, enum: [white, black] }
+    GameResult: { type: string, enum: ['1-0', '0-1', '1/2-1/2'] }
+    EndReason: { type: string, enum: [checkmate, stalemate, repetition, fiftyMove, insufficient, resign, timeout, agreement, abandon] }
+
+    Credentials:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, pattern: '^[A-Za-z0-9_가-힣]{2,16}$', description: 대소문자 구분 없이 하나만 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+
+    Rating:
+      type: object
+      required: [rating, deviation, games, wins, losses, draws, provisional]
+      properties:
+        rating: { type: integer, description: 반올림한 Glicko-2 레이팅 }
+        deviation: { type: integer, description: RD(클수록 아직 불확실) }
+        games: { type: integer }
+        wins: { type: integer }
+        losses: { type: integer }
+        draws: { type: integer }
+        provisional: { type: boolean, description: 'RD > 110 이면 잠정(레이팅 옆에 ?)' }
+    Ratings:
+      type: object
+      required: [standard, mini]
+      properties:
+        standard: { $ref: '#/components/schemas/Rating' }
+        mini: { $ref: '#/components/schemas/Rating' }
+
+    Me:
+      type: object
+      required: [username, createdAt, ratings, beginner]
+      properties:
+        username: { type: string }
+        createdAt: { type: string, format: date-time }
+        ratings: { $ref: '#/components/schemas/Ratings' }
+        beginner: { type: boolean, description: 사람 대국 20판 미만 }
+    Profile:
+      type: object
+      required: [username, createdAt, ratings, recentGames]
+      properties:
+        username: { type: string }
+        createdAt: { type: string, format: date-time }
+        ratings: { $ref: '#/components/schemas/Ratings' }
+        recentGames: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/GameSummary' } }
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, username, rating, games]
+      properties:
+        rank: { type: integer }
+        username: { type: string }
+        rating: { type: integer }
+        games: { type: integer }
+
+    HintAllowance:
+      type: object
+      required: [remaining, scope]
+      properties:
+        remaining: { type: integer, minimum: 0 }
+        scope: { type: string, enum: [game, day], description: 'game = 초보(한 판 1번) · day = 하루 1번' }
+    PracticeState:
+      type: object
+      required: [cleared, hints]
+      properties:
+        cleared:
+          type: object
+          required: [standard, mini]
+          properties:
+            standard: { type: integer, minimum: 0, maximum: 10 }
+            mini: { type: integer, minimum: 0, maximum: 10 }
+        hints: { $ref: '#/components/schemas/HintAllowance' }
+
+    PlayerInfo:
+      type: object
+      required: [username, rating]
+      properties:
+        username: { type: string }
+        rating: { type: integer, description: 대국 시작 때 레이팅 }
+        ratingChange: { type: integer, description: 끝난 뒤 오르내린 값(진행 중이면 없음) }
+    GameSummary:
+      type: object
+      required: [id, variant, timeControl, white, black, result, reason, endedAt]
+      properties:
+        id: { type: string }
+        variant: { $ref: '#/components/schemas/VariantId' }
+        timeControl: { $ref: '#/components/schemas/TimeControl' }
+        white: { $ref: '#/components/schemas/PlayerInfo' }
+        black: { $ref: '#/components/schemas/PlayerInfo' }
+        result: { $ref: '#/components/schemas/GameResult' }
+        reason: { $ref: '#/components/schemas/EndReason' }
+        endedAt: { type: string, format: date-time }
+    GameRecord:
+      allOf:
+        - { $ref: '#/components/schemas/GameSummary' }
+        - type: object
+          required: [moves, startedAt]
+          properties:
+            moves: { type: array, items: { type: string, description: 'UCI(e2e4 · e7e8q)' } }
+            startedAt: { type: string, format: date-time }
+
+    # ───────── WebSocket 글(JSON 한 덩어리 = 글 하나)
+    LobbyClientMessage:
+      oneOf:
+        - type: object
+          required: [type, variant, timeControl]
+          properties:
+            type: { const: seek }
+            variant: { $ref: '#/components/schemas/VariantId' }
+            timeControl: { $ref: '#/components/schemas/TimeControl' }
+        - type: object
+          required: [type]
+          properties: { type: { const: cancel } }
+    LobbyServerMessage:
+      oneOf:
+        - type: object
+          required: [type, waiting]
+          description: 줄 섬 · 같은 조건으로 기다리는 사람 수
+          properties: { type: { const: queued }, waiting: { type: integer } }
+        - type: object
+          required: [type, gameId, color]
+          description: 상대를 찾음 → /api/games/{gameId}/live 로 접속
+          properties: { type: { const: matched }, gameId: { type: string }, color: { $ref: '#/components/schemas/Color' } }
+        - { $ref: '#/components/schemas/ErrorMessage' }
+
+    GameClientMessage:
+      oneOf:
+        - type: object
+          required: [type, uci, ply]
+          description: '수 두기 · ply = 이 수가 몇 번째 수인지(0부터) — 늦게 온 중복 글 거르기'
+          properties: { type: { const: move }, uci: { type: string }, ply: { type: integer } }
+        - { type: object, required: [type], properties: { type: { const: resign } } }
+        - { type: object, required: [type], properties: { type: { const: offerDraw } } }
+        - { type: object, required: [type], properties: { type: { const: acceptDraw } } }
+        - { type: object, required: [type], properties: { type: { const: declineDraw } } }
+    GameServerMessage:
+      oneOf:
+        - type: object
+          required: [type, game]
+          description: 접속·다시 접속 때 전체 상태
+          properties: { type: { const: state }, game: { $ref: '#/components/schemas/LiveGame' } }
+        - type: object
+          required: [type, uci, san, ply, clocks]
+          properties:
+            type: { const: move }
+            uci: { type: string }
+            san: { type: string }
+            ply: { type: integer }
+            clocks: { $ref: '#/components/schemas/Clocks' }
+        - type: object
+          required: [type, by]
+          properties: { type: { const: drawOffered }, by: { $ref: '#/components/schemas/Color' } }
+        - type: object
+          required: [type, game]
+          description: 대국 끝(레이팅 변화 포함)
+          properties: { type: { const: end }, game: { $ref: '#/components/schemas/GameSummary' } }
+        - { $ref: '#/components/schemas/ErrorMessage' }
+    ErrorMessage:
+      type: object
+      required: [type, code, message]
+      properties:
+        type: { const: error }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string }
+    Clocks:
+      type: object
+      required: [white, black]
+      description: 남은 시간(ms) · 서버 시계가 기준
+      properties:
+        white: { type: integer }
+        black: { type: integer }
+    LiveGame:
+      type: object
+      required: [id, variant, timeControl, white, black, moves, clocks, you]
+      properties:
+        id: { type: string }
+        variant: { $ref: '#/components/schemas/VariantId' }
+        timeControl: { $ref: '#/components/schemas/TimeControl' }
+        white: { $ref: '#/components/schemas/PlayerInfo' }
+        black: { $ref: '#/components/schemas/PlayerInfo' }
+        moves: { type: array, items: { type: string } }
+        clocks: { $ref: '#/components/schemas/Clocks' }
+        you: { type: string, enum: [white, black, spectator] }
+        drawOfferBy: { $ref: '#/components/schemas/Color' }

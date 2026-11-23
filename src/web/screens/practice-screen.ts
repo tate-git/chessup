@@ -1,0 +1,76 @@
+// 봇 연습 대국 화면
+import { BLACK, BOT_LEVELS, WHITE, type Side } from '../../engine';
+import { api } from '../api';
+import { LocalHints, ServerHints, type HintSource } from '../hints';
+import { t } from '../i18n';
+import { PracticeSession, type PracticeOutcome } from '../practice';
+import { loadCleared } from '../practice-record';
+import { session, settings, type ColorChoice } from '../session';
+import { query } from '../ui/dom';
+import { endReasonLabel, variantLabel } from './labels';
+import type { Screen } from './screen';
+
+function resolveColor(choice: ColorChoice): Side {
+  if (choice === 'random') return Math.random() < 0.5 ? WHITE : BLACK;
+  return choice === 'white' ? WHITE : BLACK;
+}
+
+async function hintSource(): Promise<HintSource> {
+  return session.me ? new ServerHints((await api.practice()).hints) : new LocalHints();
+}
+
+export const practiceScreen = (level: number): Screen => async root => {
+  const variant = settings.variant;
+  root.innerHTML = `
+    <section class="play">
+      <header class="play-bar">
+        <a href="#/" class="back">← ${t('홈', 'Home')}</a>
+        <span>${variantLabel(variant)} · 🤖 ${t(`봇 ${level}단`, `Bot level ${level}`)}</span>
+      </header>
+      <div class="table">
+        <div class="board-wrap"><div id="board"></div></div>
+        <aside class="side">
+          <p id="status" class="status"></p>
+          <ol id="moves" class="moves"></ol>
+          <div class="controls">
+            <button type="button" id="hint"></button>
+            <button type="button" data-action="flip">🔄 ${t('뒤집기', 'Flip')}</button>
+            <button type="button" data-action="resign">🏳️ ${t('기권', 'Resign')}</button>
+          </div>
+        </aside>
+      </div>
+      <dialog id="result" class="result"></dialog>
+    </section>`;
+
+  const [cleared, hints] = await Promise.all([loadCleared(), hintSource()]);
+  const session = new PracticeSession(
+    { variant, level, playerSide: resolveColor(settings.color), clearedBefore: cleared[variant], hints },
+    {
+      board: query(root, '#board'),
+      status: query(root, '#status'),
+      moves: query(root, '#moves'),
+      hintButton: query<HTMLButtonElement>(root, '#hint'),
+      onFinish: outcome => showResult(root, level, outcome),
+    },
+  );
+  query(root, '#hint').onclick = () => void session.hint();
+  query(root, '[data-action="flip"]').onclick = () => session.flip();
+  query(root, '[data-action="resign"]').onclick = () => session.resign();
+};
+
+function showResult(root: HTMLElement, level: number, { status, won, newClear }: PracticeOutcome): void {
+  const dialog = query<HTMLDialogElement>(root, '#result');
+  const draw = status.result === '1/2-1/2';
+  const canAdvance = won && level < BOT_LEVELS.length;
+  dialog.innerHTML = `
+    <p class="result-icon">${won ? '🏆' : draw ? '🤝' : '😵'}</p>
+    <h2>${won ? t('승리!', 'You win!') : draw ? t('무승부', 'Draw') : t('패배', 'You lost')}</h2>
+    <p class="muted">${endReasonLabel(status.reason)}${newClear ? ` · ${t(`봇 ${level}단 첫 격파!`, `Level ${level} cleared!`)}` : ''}</p>
+    <div class="row">
+      ${canAdvance ? `<a class="button primary" href="#/practice/${level + 1}">${t(`${level + 1}단 도전`, `Try level ${level + 1}`)}</a>` : ''}
+      <button type="button" data-action="again">${t('한 판 더', 'Play again')}</button>
+      <a class="button ghost" href="#/">${t('홈', 'Home')}</a>
+    </div>`;
+  query(dialog, '[data-action="again"]').onclick = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
+  dialog.showModal();
+}

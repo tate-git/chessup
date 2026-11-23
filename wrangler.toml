@@ -1,0 +1,28 @@
+name = "chessup"
+main = "src/worker/index.ts"
+compatibility_date = "2026-06-01"
+
+# 화면(Vite 빌드 결과)은 정적 파일로, /api 는 Worker 가 처리
+[assets]
+binding = "ASSETS"
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "chessup"
+database_id = "local-placeholder"   # 배포 전에 `wrangler d1 create chessup` 결과로 바꿈
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+[[durable_objects.bindings]]
+name = "GAME_ROOM"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Lobby", "GameRoom"]
