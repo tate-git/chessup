@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- 공유 미리보기 그림(1200×630) 원본 · 찍어서 public/og.png 로 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1200px; height: 630px; overflow: hidden; background: #f4f1ea; font-family: "Apple SD Gothic Neo", "Pretendard", system-ui, sans-serif; color: #1f2421; display: flex; align-items: center; gap: 56px; padding: 0 72px; }
+  .text { flex: 1; }
+  .logo { width: 96px; height: 96px; }
+  h1 { font-size: 96px; font-weight: 800; letter-spacing: -2px; margin-top: 12px; }
+  .tagline { font-size: 38px; color: #5b5f58; margin-top: 14px; }
+  .pills { display: flex; gap: 10px; margin-top: 40px; }
+  .pills span { font-size: 23px; padding: 9px 16px; white-space: nowrap; border-radius: 999px; background: #fff; border: 2px solid #e4dfd3; }
+  .board { flex: none; display: grid; grid-template-columns: repeat(5, 86px); border: 14px solid #c8862e; border-radius: 14px; box-shadow: 0 0 0 5px rgb(232 176 74 / 0.5), 0 0 36px rgb(232 176 74 / 0.45), 0 12px 36px rgb(0 0 0 / 0.2); overflow: hidden; }
+  .board div { width: 86px; height: 86px; display: grid; place-items: center; }
+  .board .l { background: #f0d9b5; } .board .d { background: #b58863; } .board .hl { background: #d9ad3d; }
+  .board img { width: 78px; height: 78px; }
+</style>
+</head>
+<body>
+  <div class="text">
+    <img class="logo" src="../public/piece/ln.svg" alt="">
+    <h1>체스업</h1>
+    <p class="tagline">체스로 랭크를 올려요</p>
+    <div class="pills"><span>⚔️ 랭킹 대결</span><span>🤖 봇과 연습</span><span>👤 가입 없이 바로</span></div>
+  </div>
+  <div class="board" id="board"></div>
+  <script>
+    // 5×5 한 조각: 판 가운데 싸움(위 흑, 아래 백) · 마지막 수 칸은 금빛
+    const rows = [
+      ['dr', '', 'dk', '', ''],
+      ['dp', 'dp', '', 'dq', 'dp'],
+      ['', '', 'dn', '', ''],
+      ['', 'lb', 'lp', 'lp', ''],
+      ['lp', '', 'ln', 'lq', 'lk'],
+    ];
+    const highlight = new Set(['3,1']);
+    document.getElementById('board').innerHTML = rows.flatMap((row, r) => row.map((piece, c) =>
+      `<div class="${highlight.has(`${r},${c}`) ? 'hl' : (r + c) % 2 ? 'd' : 'l'}">${piece ? `<img src="../public/piece/${piece}.svg">` : ''}</div>`)).join('');
+  </script>
+</body>
+</html>
