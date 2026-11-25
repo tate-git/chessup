@@ -5,10 +5,11 @@
   --ink: #1f2421;
   --muted: #6b726d;
   --line: #e3ded3;
-  --accent: #3d7a4a;
+  /* 흑백: 강조는 검정, 판은 회색 두 단계 */
+  --accent: #1f2421;
   --accent-ink: #ffffff;
-  --square-light: #eeeed2;
-  --square-dark: #769656;
+  --square-light: #ececec;
+  --square-dark: #a2a2a2;
   --highlight: rgb(255 214 10 / 0.45);
   --check: radial-gradient(circle, rgb(255 40 40 / 0.85) 0%, rgb(255 40 40 / 0) 70%);
   --radius: 14px;
@@ -22,6 +23,8 @@
     --ink: #ecefe9;
     --muted: #9aa39c;
     --line: #353b37;
+    --accent: #ecefe9;
+    --accent-ink: #1b1e1c;
   }
 }
 
