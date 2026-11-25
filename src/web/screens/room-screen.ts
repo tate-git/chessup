@@ -1,7 +1,7 @@
 // 방 링크(#/room/1234)로 들어오면: 로그인 안 했으면 게스트로 시작하고 그 방에 바로 들어감
 import { api } from '../api';
 import { t } from '../i18n';
-import { joinRoom } from '../lobby-client';
+import { joinRoom, type LobbyConnection } from '../lobby-client';
 import { session } from '../session';
 import { query } from '../ui/dom';
 import { navigate, type Screen } from './screen';
@@ -13,15 +13,15 @@ export const roomScreen = (code: string): Screen => root => {
       <div class="card room-join"><p class="result-icon">🚪</p><p id="room-info" class="muted">${t('방에 들어가는 중…', 'Joining the room…')}</p></div>
     </section>`;
   const info = query(root, '#room-info');
-  let cancel: (() => void) | null = null;
+  let lobby: LobbyConnection | null = null;
   let left = false;
 
   void (async () => {
     if (!session.me) await api.guest();
     if (left) return;
-    cancel = joinRoom(code, {
+    lobby = joinRoom(code, {
       onMatched: gameId => {
-        cancel = null;
+        lobby = null;
         navigate(`#/live/${gameId}`);
       },
       onError: message => (info.textContent = message),
@@ -30,6 +30,6 @@ export const roomScreen = (code: string): Screen => root => {
 
   return () => {
     left = true;
-    cancel?.();
+    lobby?.cancel();
   };
 };

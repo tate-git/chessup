@@ -1,9 +1,12 @@
-// 대국방(Durable Object · 대국 하나에 하나): 수 검사 · 시계 · 무승부 제안 · 끝나면 회원만 레이팅 반영(게스트는 1500 으로 셈) · 기록은 회원끼리만 · 접속한 모두에게 알림
+// 대결방(Durable Object · 대결 하나에 하나): 수 검사 · 시계 · 무승부 제안 · 랜덤 봇은 서버가 둠 · 끝나면 회원만 레이팅 반영(게스트 1500 · 봇은 단계 레이팅) · 기록은 회원끼리만 · 접속한 모두에게 알림
 import { DurableObject } from 'cloudflare:workers';
 import { Game, type EndReason as EngineEndReason } from '../../engine/game';
 import { parseTimeControl, type Clocks, type Color, type EndReason, type GameClientMessage, type GameResult, type GameServerMessage, type GameSummary, type LiveGame, type TimeControl } from '../../shared/protocol';
 import type { VariantId } from '../../engine/variants';
+import { chooseBotMove } from '../../engine/bot';
+import type { Move } from '../../engine/move';
 import { insertGameStatement } from '../db/games';
+import { botRating } from '../rating/bot-rating';
 import { resultStatements, type ResultPlayer } from '../db/weekly';
 import { freshRating, loadRating, saveRatingStatement, type RatingRow } from '../db/ratings';
 import type { Env } from '../env';
@@ -13,8 +16,10 @@ import { clocksAfterMove, colorToMove, liveClocks, nextDeadline } from './clock'
 export interface SeatedPlayer {
   readonly id: string;
   readonly username: string;
-  /** false = 게스트(레이팅 없음 · 처음 값으로 셈) · 예전에 저장된 대국엔 없음 → 회원 */
+  /** false = 게스트·봇(레이팅 저장 안 함) · 예전에 저장된 대결엔 없음 → 회원 */
   readonly member?: boolean;
+  /** 랜덤 봇이면 단계(서버가 수를 둠) */
+  readonly bot?: number;
 }
 
 export interface GameSetup {
@@ -45,14 +50,20 @@ interface StoredGame {
 
 type Seat = Color | 'spectator';
 const STORAGE_KEY = 'game';
+/** 봇이 너무 빨리 두지 않게 · 서버 계산은 한 수 1초까지 */
+const BOT_DELAY_MS = 400;
+const BOT_THINK_CAP_MS = 1_000;
 
 export class GameRoom extends DurableObject<Env> {
   #game: StoredGame | null = null;
 
   /** 로비가 짝을 지으면 부름 */
   async start(setup: GameSetup): Promise<void> {
-    // 게스트는 DB 에 없으니 처음 값(1500)으로 셈
-    const ratingOf = (player: SeatedPlayer) => (isMember(player) ? loadRating(this.env.DB, player.id, setup.variant) : freshRating(setup.variant));
+    // 게스트는 DB 에 없으니 처음 값(1500) · 봇은 단계 레이팅
+    const ratingOf = async (player: SeatedPlayer): Promise<RatingRow> => {
+      if (player.bot) return { ...freshRating(setup.variant), ...botRating(player.bot) };
+      return isMember(player) ? loadRating(this.env.DB, player.id, setup.variant) : freshRating(setup.variant);
+    };
     const [white, black] = await Promise.all([ratingOf(setup.white), ratingOf(setup.black)]);
     const { initialMs } = parseTimeControl(setup.timeControl);
     const game: StoredGame = {
@@ -65,12 +76,13 @@ export class GameRoom extends DurableObject<Env> {
       startedAt: new Date().toISOString(),
     };
     await this.#save(game);
+    await this.#scheduleNext(game);   // 봇이 백이면 첫 수
   }
 
   /** WebSocket 접속(Worker 가 X-User-Id 를 붙여 보냄 — 없으면 관전) */
   override async fetch(request: Request): Promise<Response> {
     const game = await this.#load();
-    if (!game) return Response.json({ error: { code: 'not_found', message: '대국을 찾을 수 없어요' } }, { status: 404 });
+    if (!game) return Response.json({ error: { code: 'not_found', message: '대결을 찾을 수 없어요' } }, { status: 404 });
     const { 0: client, 1: server } = new WebSocketPair();
     const seat = seatOf(game, request.headers.get('X-User-Id'));
     this.ctx.acceptWebSocket(server, [seat]);
@@ -82,7 +94,7 @@ export class GameRoom extends DurableObject<Env> {
     const game = await this.#load();
     const seat = this.ctx.getTags(socket)[0] as Seat;
     if (!game || seat === 'spectator' || typeof raw !== 'string') return;
-    if (game.ended) return send(socket, errorMessage('game_over', '이미 끝난 대국이에요'));
+    if (game.ended) return send(socket, errorMessage('game_over', '이미 끝난 대결이에요'));
 
     const message = parseMessage(raw);
     if (!message) return send(socket, errorMessage('invalid_input', '알 수 없는 글'));
@@ -95,10 +107,11 @@ export class GameRoom extends DurableObject<Env> {
     }
   }
 
-  /** 시간 초과 · 첫 수 제한 */
+  /** 봇 차례면 봇이 둠 · 아니면 시간 초과 · 첫 수 제한 */
   override async alarm(): Promise<void> {
     const game = await this.#load();
     if (!game || game.ended) return;
+    if (botToMove(game)) return this.#botMove(game);
     const ply = game.moves.length;
     if (ply < 2) return this.#finish(game, '1/2-1/2', 'abandon');
     const loser = colorToMove(ply);
@@ -112,7 +125,20 @@ export class GameRoom extends DurableObject<Env> {
     const board = replay(game);
     const move = board.findMove(uci);
     if (!move) return send(socket, errorMessage('illegal_move', '둘 수 없는 수예요'));
+    await this.#play(game, seat, board, move);
+  }
 
+  /** 봇 한 수(서버에서 계산 · 생각 시간 상한) */
+  async #botMove(game: StoredGame): Promise<void> {
+    const seat = colorToMove(game.moves.length);
+    const board = replay(game);
+    const move = chooseBotMove(board.position, game[seat].bot!, Math.random, BOT_THINK_CAP_MS);
+    if (move) await this.#play(game, seat, board, move);
+  }
+
+  /** 수 하나 반영(사람·봇 공통): 시계 · 저장 · 알림 · 끝났는지 · 다음 차례 준비 */
+  async #play(game: StoredGame, seat: Color, board: Game, move: Move): Promise<void> {
+    const ply = game.moves.length;
     const now = Date.now();
     const { incrementMs } = parseTimeControl(game.timeControl);
     const clocks = clocksAfterMove(game.clocks, ply, game.turnStartedAt, now, incrementMs);
@@ -128,7 +154,7 @@ export class GameRoom extends DurableObject<Env> {
 
     const status = board.status();
     if (status.over) return this.#finish(game, status.result, toEndReason(status.reason));
-    await this.#scheduleDeadline(game);
+    await this.#scheduleNext(game);
   }
 
   async #offerDraw(game: StoredGame, seat: Color): Promise<void> {
@@ -152,7 +178,8 @@ export class GameRoom extends DurableObject<Env> {
     const endedAt = new Date().toISOString();
     const change = (before: RatingRow, after: RatingRow) => Math.round(after.rating) - Math.round(before.rating);
     const info = (player: PlayerState, after: RatingRow) =>
-      isMember(player) ? { username: player.username, rating: Math.round(player.rating.rating), ratingChange: change(player.rating, after) } : { username: player.username, guest: true };
+      player.bot ? { username: player.username, rating: Math.round(player.rating.rating), bot: player.bot }
+        : isMember(player) ? { username: player.username, rating: Math.round(player.rating.rating), ratingChange: change(player.rating, after) } : { username: player.username, guest: true };
     const summary: GameSummary = {
       id: game.id,
       variant: game.variant,
@@ -178,7 +205,7 @@ export class GameRoom extends DurableObject<Env> {
         ...(isMember(game.white) ? [saveRatingStatement(db, game.white.id, whiteAfter)] : []),
         ...(isMember(game.black) ? [saveRatingStatement(db, game.black.id, blackAfter)] : []),
         // 이번 주 랭킹(게스트 포함)
-        ...resultStatements(db, { id: game.id, variant: game.variant, result, endedAt }, resultPlayer(game.white), resultPlayer(game.black)),
+        ...resultStatements(db, { id: game.id, variant: game.variant, result, endedAt }, resultPlayer(game.white), resultPlayer(game.black)),   // 봇 줄은 빠짐
       ];
       await db.batch(statements);
     }
@@ -192,8 +219,15 @@ export class GameRoom extends DurableObject<Env> {
     return this.ctx.storage.setAlarm(nextDeadline(game.clocks, game.moves.length, game.turnStartedAt));
   }
 
+  /** 다음 차례가 봇이면 잠깐 뒤 봇이 두게, 사람이면 시간 마감 */
+  #scheduleNext(game: StoredGame): Promise<void> {
+    return botToMove(game) ? this.ctx.storage.setAlarm(Date.now() + BOT_DELAY_MS) : this.#scheduleDeadline(game);
+  }
+
   #liveView(game: StoredGame, seat: Seat): LiveGame {
-    const player = (state: PlayerState) => (isMember(state) ? { username: state.username, rating: Math.round(state.rating.rating) } : { username: state.username, guest: true });
+    const player = (state: PlayerState) =>
+      state.bot ? { username: state.username, rating: Math.round(state.rating.rating), bot: state.bot }
+        : isMember(state) ? { username: state.username, rating: Math.round(state.rating.rating) } : { username: state.username, guest: true };
     return {
       id: game.id,
       variant: game.variant,
@@ -276,6 +310,7 @@ function send(socket: WebSocket, message: GameServerMessage): void {
   }
 }
 
-const isMember = (player: SeatedPlayer) => player.member !== false;
+const isMember = (player: SeatedPlayer) => player.member !== false && !player.bot;
 
-const resultPlayer = (player: SeatedPlayer): ResultPlayer => ({ id: player.id, name: player.username, guest: !isMember(player) });
+const resultPlayer = (player: SeatedPlayer): ResultPlayer | null => (player.bot ? null : { id: player.id, name: player.username, guest: !isMember(player) });
+const botToMove = (game: StoredGame) => Boolean(game[colorToMove(game.moves.length)].bot);

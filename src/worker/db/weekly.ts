@@ -12,20 +12,19 @@ export interface ResultPlayer {
   readonly guest: boolean;
 }
 
-/** 대국 하나의 두 사람 결과(이미 있으면 그대로) */
+/** 대결 하나의 두 사람 결과(이미 있으면 그대로) · null(봇)은 빼고 */
 export function resultStatements(
   db: D1Database,
   game: { id: string; variant: VariantId; result: GameResult; endedAt: string },
-  white: ResultPlayer,
-  black: ResultPlayer,
+  white: ResultPlayer | null,
+  black: ResultPlayer | null,
 ): D1PreparedStatement[] {
   const whiteScore = game.result === '1-0' ? 1 : game.result === '0-1' ? 0 : 0.5;
   const week = koreaWeekStart(new Date(game.endedAt));
-  return [
-    [white, whiteScore],
-    [black, 1 - whiteScore],
-  ].map(([player, score]) => {
-    const { id, name, guest } = player as ResultPlayer;
+  const rows: [ResultPlayer | null, number][] = [[white, whiteScore], [black, 1 - whiteScore]];
+  return rows.flatMap(([player, score]) => {
+    if (!player) return [];
+    const { id, name, guest } = player;
     return db
       .prepare(
         `INSERT INTO match_results (game_id, player_id, name, guest, variant, week_start, score, ended_at)

@@ -10,8 +10,14 @@ export interface LobbyHandlers {
 
 export const socketUrl = (path: string) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
 
-/** 로비에 붙어 첫 글을 보내고 답을 넘겨줌 · 돌려준 함수를 부르면 취소 */
-function connect(first: LobbyClientMessage, handlers: LobbyHandlers): () => void {
+/** 줄 선 동안 할 수 있는 것: 취소 · 사람 대신 랜덤 봇과 바로 */
+export interface LobbyConnection {
+  readonly cancel: () => void;
+  readonly playBot: () => void;
+}
+
+/** 로비에 붙어 첫 글을 보내고 답을 넘겨줌 */
+function connect(first: LobbyClientMessage, handlers: LobbyHandlers): LobbyConnection {
   const socket = new WebSocket(socketUrl('/api/lobby'));
   socket.addEventListener('open', () => socket.send(JSON.stringify(first)));
   socket.addEventListener('message', event => {
@@ -26,9 +32,15 @@ function connect(first: LobbyClientMessage, handlers: LobbyHandlers): () => void
     }
   });
   socket.addEventListener('error', () => handlers.onError('연결이 끊겼어요'));
-  return () => {
-    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'cancel' }));
-    socket.close();
+  const send = (message: LobbyClientMessage) => {
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  };
+  return {
+    cancel: () => {
+      send({ type: 'cancel' });
+      socket.close();
+    },
+    playBot: () => send({ type: 'playBot' }),
   };
 }
 

@@ -47,6 +47,8 @@ export interface PlayerInfo {
   /** 게스트는 없음(레이팅은 회원만 쌓임) */
   readonly rating?: number;
   readonly guest?: boolean;
+  /** 랜덤 봇이면 단계 */
+  readonly bot?: number;
   readonly ratingChange?: number;
 }
 
@@ -137,6 +139,8 @@ export type LobbyClientMessage =
   /** 방 만들기: 방 번호를 받아 친구가 들어올 때까지 기다림 */
   | { readonly type: 'createRoom'; readonly variant: VariantId; readonly timeControl: TimeControl }
   | { readonly type: 'joinRoom'; readonly code: string }
+  /** 줄 서 있는 중에 사람 대신 랜덤 봇과 바로(내 레이팅 근처 단계) */
+  | { readonly type: 'playBot' }
   | { readonly type: 'cancel' };
 
 export type LobbyServerMessage =

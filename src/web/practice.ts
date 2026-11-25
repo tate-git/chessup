@@ -158,7 +158,7 @@ export class PracticeSession {
     });
     // 내 차례는 글자 대신 판 테두리로 알림 · 글자는 화면 읽기용으로만 남김
     this.view.board.classList.toggle('my-turn', this.#isPlayerTurn());
-    this.view.status.textContent = this.#finished ? t('대국 끝', 'Game over') : this.#botThinking ? t('🤖 생각 중…', '🤖 Thinking…') : t('내 차례', 'Your move');
+    this.view.status.textContent = this.#finished ? t('대결 끝', 'Game over') : this.#botThinking ? t('🤖 생각 중…', '🤖 Thinking…') : t('내 차례', 'Your move');
     this.view.moves.innerHTML = moveListHtml(this.game.history.map(played => played.san));
     this.view.moves.scrollTop = this.view.moves.scrollHeight;
     this.#updateButtons();

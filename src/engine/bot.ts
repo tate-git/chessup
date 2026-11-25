@@ -25,9 +25,10 @@ export const BOT_LEVELS: readonly BotLevel[] = [
 
 const HINT = { depth: 12, timeLimitMs: 1500 } as const;
 
-export function chooseBotMove(position: Position, level: number, random: () => number = Math.random): Move | null {
+/** timeCapMs: 생각 시간 상한(서버에서 둘 때 짧게) · 단계의 깊이·흔들림은 그대로 */
+export function chooseBotMove(position: Position, level: number, random: () => number = Math.random, timeCapMs = Infinity): Move | null {
   const settings = BOT_LEVELS[Math.min(Math.max(level, 1), BOT_LEVELS.length) - 1];
-  return search(position, { maxDepth: settings.depth, timeLimitMs: settings.timeLimitMs, noise: settings.noise, random }).move;
+  return search(position, { maxDepth: settings.depth, timeLimitMs: Math.min(settings.timeLimitMs, timeCapMs), noise: settings.noise, random }).move;
 }
 
 export function findHint(position: Position): Move | null {

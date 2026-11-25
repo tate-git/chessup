@@ -92,7 +92,7 @@ export class LiveSession {
     for (const uci of state.moves) this.#game.playUci(uci);
     this.#setClocks(state.clocks);
     this.#board.orientation = state.you === 'black' ? BLACK : WHITE;
-    this.view.title.textContent = `⚔️ ${t('대국', 'Game')}`;
+    this.view.title.textContent = `⚔️ ${t('랭킹 대결', 'Ranked match')}`;
     this.view.drawButtons.hidden = !(state.drawOfferBy && state.you !== 'spectator' && state.drawOfferBy !== state.you);
     this.#render();
   }
@@ -176,7 +176,7 @@ export class LiveSession {
     });
     const bottom: Color = state.you === 'black' ? 'black' : 'white';
     const top: Color = bottom === 'white' ? 'black' : 'white';
-    const player = (color: Color) => `${color === 'white' ? '⚪' : '⚫'} <b>${escapeHtml(state[color].username)}</b> ${state[color].guest ? `<span class="tag">${t('게스트', 'Guest')}</span>` : ''}${state[color].rating === undefined ? '' : `<span class="muted">${state[color].rating}</span>`}`;
+    const player = (color: Color) => `${color === 'white' ? '⚪' : '⚫'} <b>${state[color].bot ? `🤖 ${t(`봇 ${state[color].bot}단`, `Bot lv ${state[color].bot}`)}` : escapeHtml(state[color].username)}</b> ${state[color].guest ? `<span class="tag">${t('게스트', 'Guest')}</span>` : ''}${state[color].bot ? `<span class="tag">${t('랜덤 봇', 'Random bot')}</span> ` : ''}${state[color].rating === undefined ? '' : `<span class="muted">${state[color].rating}</span>`}`;
     this.view.topPlayer.innerHTML = player(top);
     this.view.bottomPlayer.innerHTML = player(bottom);
     this.view.moves.innerHTML = moveListHtml(game.history.map(played => played.san));

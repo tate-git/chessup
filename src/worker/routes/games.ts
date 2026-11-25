@@ -6,6 +6,6 @@ import { notFound } from '../errors';
 
 export const gameRoutes = new Hono<AppEnv>().get('/:id', async context => {
   const game = await findGame(context.env.DB, context.req.param('id'));
-  if (!game) throw notFound('대국');
+  if (!game) throw notFound('대결');
   return context.json(toRecord(game));
 });

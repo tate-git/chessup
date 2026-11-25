@@ -215,3 +215,52 @@ describe('방 번호', () => {
     expect((await guestLobby.next(m => m.type === 'matched')).gameId).toBe((await hostLobby.next(m => m.type === 'matched')).gameId);
   });
 });
+
+describe('랜덤 봇', () => {
+  it('줄 서 있다가 봇과 바로: 서버가 봇 수를 두고 · 끝나면 회원 레이팅·이번 주 승점 반영(봇 줄은 없음)', async () => {
+    const member = TestUser.fresh('m');
+    await member.signup();
+    const lobby = await member.connect('/api/lobby');
+    lobby.send({ type: 'seek', variant: 'mini', timeControl: '3+2' });
+    await lobby.next(m => m.type === 'queued');   // 줄 선 뒤에(화면도 찾는 중 창이 뜬 뒤 누름)
+    lobby.send({ type: 'playBot' });
+    const matched = await lobby.next(m => m.type === 'matched');
+    lobby.close();
+
+    const live = await member.connect(`/api/games/${matched.gameId}/live`);
+    const state = (await live.next(m => m.type === 'state')).game;
+    const botColor = matched.color === 'white' ? 'black' : 'white';
+    expect(state[botColor].bot).toBeGreaterThanOrEqual(1);
+    expect(state[botColor].rating).toBeGreaterThanOrEqual(800);
+
+    // 내 차례가 될 때까지(봇이 백이면 봇이 먼저 둠) · 한 수 두면 봇이 받아 둠
+    let ply = 0;
+    if (matched.color === 'black') {
+      await live.next(m => m.type === 'move' && m.ply === 0, 15_000);
+      ply = 1;
+    }
+    const myMove = matched.color === 'white' ? 'b2b3' : 'b5b4';
+    live.send({ type: 'move', uci: myMove, ply });
+    await live.next(m => m.type === 'move' && m.ply === ply);
+    const reply = await live.next(m => m.type === 'move' && m.ply === ply + 1, 15_000);
+    expect(reply.uci).toMatch(/^[a-f][1-6][a-f][1-6][qrn]?$/);
+
+    live.send({ type: 'resign' });
+    const end = (await live.next(m => m.type === 'end')).game;
+    expect(end[matched.color].ratingChange).toBeLessThan(0);
+    expect(end[botColor].ratingChange).toBeUndefined();
+    expect((await member.request('GET', '/api/me')).json.ratings.mini.games).toBe(1);
+
+    const weekly = (await member.request('GET', '/api/leaderboard/weekly?variant=mini')).json.entries;
+    expect(weekly.find((entry: { mine: boolean }) => entry.mine)).toMatchObject({ games: 1, points: 0 });
+    expect(weekly.some((entry: { username: string }) => entry.username.startsWith('봇 '))).toBe(false);
+  }, 40_000);
+
+  it('줄 서지 않고 봇을 부르면 거절', async () => {
+    const member = TestUser.fresh('m');
+    await member.signup();
+    const lobby = await member.connect('/api/lobby');
+    lobby.send({ type: 'playBot' });
+    expect((await lobby.next(m => m.type === 'error')).code).toBe('invalid_input');
+  });
+});

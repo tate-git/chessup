@@ -3,7 +3,7 @@ import { BOT_LEVELS } from '../../engine';
 import { TIME_CONTROLS, type TimeControl, type VariantId } from '../../shared/protocol';
 import { api } from '../api';
 import { lang, switchLang, t } from '../i18n';
-import { createRoom, joinRoom, roomLink, seek } from '../lobby-client';
+import { createRoom, joinRoom, roomLink, seek, type LobbyConnection } from '../lobby-client';
 import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
 import { escapeHtml, query } from '../ui/dom';
@@ -14,8 +14,13 @@ import { navigate, type Screen } from './screen';
 const COLOR_CHOICES: readonly ColorChoice[] = ['white', 'black', 'random'];
 const colorLabel = (choice: ColorChoice) => ({ white: t('⚪ 백으로', '⚪ White'), black: t('⚫ 흑으로', '⚫ Black'), random: t('🎲 무작위', '🎲 Random') })[choice];
 
+/** 사람을 못 찾으면 몇 초 뒤 봇과 */
+const BOT_FALLBACK_SECONDS = 15;
+
 export const homeScreen: Screen = async root => {
-  let cancelSeek: (() => void) | null = null;
+  let lobby: LobbyConnection | null = null;
+  /** 사람을 못 찾으면 봇으로 넘어가는 초읽기 */
+  let botTimer = 0;
   let roomCode: string | null = null;
   const render = async () => {
     document.documentElement.lang = lang;
@@ -102,7 +107,8 @@ export const homeScreen: Screen = async root => {
   };
 
   const goToGame = (gameId: string) => {
-    cancelSeek = null;
+    lobby = null;
+    window.clearInterval(botTimer);
     query<HTMLDialogElement>(root, '#seeking').close();
     navigate(`#/live/${gameId}`);
   };
@@ -144,13 +150,26 @@ export const homeScreen: Screen = async root => {
   const startSeeking = async (timeControl: TimeControl) => {
     const guestName = await ensurePlayer();
     const label = `${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)}${guestName ? ` · ${guestName}` : ''}`;
-    const dialog = waitDialog('🔎', t('상대를 찾는 중…', 'Finding an opponent…'), '');
+    const dialog = waitDialog('🔎', t('상대를 찾는 중…', 'Finding an opponent…'),
+      `<button type="button" class="primary wide" data-action="play-bot">🤖 ${t('봇과 바로 두기', 'Play a bot now')}</button>
+       <p class="muted small" id="bot-countdown"></p>`);
     query(dialog, '#seek-info').textContent = label;
-    cancelSeek = seek(settings.variant, timeControl, {
+    lobby = seek(settings.variant, timeControl, {
       onQueued: waiting => (query(dialog, '#seek-info').textContent = `${label} · ${t(`대기 ${waiting}명`, `${waiting} waiting`)}`),
       onMatched: goToGame,
       onError: message => (query(dialog, '#seek-info').textContent = message),
     });
+    // 사람을 못 찾으면 15초 뒤 내 레이팅 근처 랜덤 봇과
+    let left = BOT_FALLBACK_SECONDS;
+    const tick = () => (query(dialog, '#bot-countdown').textContent = t(`${left}초 안에 상대가 없으면 랜덤 봇과 둬요`, `A random bot joins in ${left}s if no one is found`));
+    tick();
+    window.clearInterval(botTimer);
+    botTimer = window.setInterval(() => {
+      left -= 1;
+      if (left > 0) return tick();
+      window.clearInterval(botTimer);
+      lobby?.playBot();
+    }, 1_000);
   };
 
   /** 방 만들기: 시간 고르기 → 방 번호·링크 보여 주고 친구를 기다림 */
@@ -163,7 +182,7 @@ export const homeScreen: Screen = async root => {
   const openRoom = async (timeControl: TimeControl) => {
     await ensurePlayer();
     const dialog = waitDialog('⏳', t('방을 만드는 중…', 'Creating room…'), '');
-    cancelSeek = createRoom(settings.variant, timeControl, {
+    lobby = createRoom(settings.variant, timeControl, {
       onRoomCreated: code => {
         roomCode = code;
         waitDialog('🔑', t('방을 만들었어요 · 방 번호', 'Room created · number'),
@@ -182,7 +201,7 @@ export const homeScreen: Screen = async root => {
     if (!/^\d{4}$/.test(code)) return alert(t('방 번호는 숫자 네 자리예요', 'Room numbers are four digits'));
     await ensurePlayer();
     const dialog = waitDialog('🚪', t(`방 ${code}에 들어가는 중…`, `Joining room ${code}…`), '');
-    cancelSeek = joinRoom(code, {
+    lobby = joinRoom(code, {
       onMatched: goToGame,
       onError: message => (query(dialog, '#seek-info').textContent = message),
     });
@@ -210,8 +229,9 @@ export const homeScreen: Screen = async root => {
   };
 
   const stopSeeking = () => {
-    cancelSeek?.();
-    cancelSeek = null;
+    window.clearInterval(botTimer);
+    lobby?.cancel();
+    lobby = null;
     roomCode = null;
     root.querySelector<HTMLDialogElement>('#seeking')?.close();
   };
@@ -239,6 +259,10 @@ export const homeScreen: Screen = async root => {
       return render();
     }
     if (action === 'share-room') return shareRoom(button);
+    if (action === 'play-bot') {
+      window.clearInterval(botTimer);
+      return lobby?.playBot();
+    }
     if (action === 'cancel-seek') return stopSeeking();
     if (button.closest('form')) return;   // 방 들어가기는 아래 onsubmit
     if (action === 'lang') switchLang();

@@ -1,10 +1,12 @@
 // 매칭 로비(Durable Object · 하나): 회원·게스트 한 줄 — 같은 종목·시간끼리, 레이팅 차이가 허용 범위면 짝(오래 기다릴수록 넓어짐, 게스트는 1500)
-// 방: 방 번호(숫자 네 자리)를 만들어 기다리면, 번호를 넣은 사람과 바로 짝
+// 방: 방 번호(숫자 네 자리)를 만들어 기다리면, 번호를 넣은 사람과 바로 짝 · 줄 서 있다가 「봇과 바로」면 내 레이팅 근처 랜덤 봇과
 import { DurableObject } from 'cloudflare:workers';
 import { isVariantId } from '../../engine/variants';
 import { TIME_CONTROLS, type LobbyClientMessage, type LobbyServerMessage, type TimeControl } from '../../shared/protocol';
 import type { VariantId } from '../../engine/variants';
 import { INITIAL_RATING } from '../rating/glicko2';
+import { pickBotLevel } from '../rating/bot-rating';
+import type { SeatedPlayer } from './game-room';
 import { loadRating } from '../db/ratings';
 import type { Env } from '../env';
 
@@ -45,6 +47,8 @@ export class Lobby extends DurableObject<Env> {
         return socket.serializeAttachment(idle(seeker));
       case 'joinRoom':
         return this.#joinRoom(socket, seeker, message.code);
+      case 'playBot':
+        return this.#playBot(socket, seeker);
       case 'createRoom':
       case 'seek': {
         if (!isVariantId(message.variant) || !TIME_CONTROLS[message.variant].includes(message.timeControl)) {
@@ -85,6 +89,19 @@ export class Lobby extends DurableObject<Env> {
     await this.#startGame(host, { socket, seeker: idle(seeker) }, variant, timeControl);
   }
 
+  /** 줄 서 있던 조건(종목·시간) 그대로 랜덤 봇과 · 봇 단계는 내 레이팅 근처 */
+  async #playBot(socket: WebSocket, seeker: Seeker): Promise<void> {
+    if (!seeker.seek) return send(socket, { type: 'error', code: 'invalid_input', message: '먼저 시간을 골라 주세요' });
+    const { variant, timeControl, rating } = seeker.seek;
+    const level = pickBotLevel(rating);
+    const human = { socket, seeker: idle(seeker) };
+    const [white, black] = Math.random() < 0.5 ? [seat(seeker), botSeat(level)] : [botSeat(level), seat(seeker)];
+    const gameId = crypto.randomUUID();
+    await this.env.GAME_ROOM.get(this.env.GAME_ROOM.idFromName(gameId)).start({ id: gameId, variant, timeControl, white, black });
+    socket.serializeAttachment(human.seeker);
+    send(socket, { type: 'matched', gameId, color: white.bot ? 'black' : 'white' });
+  }
+
   /** 기다리는 사람들 중 짝이 되는 둘을 계속 묶음 · 남은 사람이 있으면 잠시 뒤 다시 */
   async #matchWaiting(): Promise<void> {
     const now = Date.now();
@@ -104,8 +121,7 @@ export class Lobby extends DurableObject<Env> {
     const [white, black] = Math.random() < 0.5 ? [a, b] : [b, a];
     const gameId = crypto.randomUUID();
     const room = this.env.GAME_ROOM.get(this.env.GAME_ROOM.idFromName(gameId));
-    const seat = ({ seeker }: WaitingEntry) => ({ id: seeker.userId, username: seeker.username, member: seeker.member });
-    await room.start({ id: gameId, variant, timeControl, white: seat(white), black: seat(black) });
+    await room.start({ id: gameId, variant, timeControl, white: seat(white.seeker), black: seat(black.seeker) });
     for (const [entry, color] of [[white, 'white'], [black, 'black']] as const) {
       entry.socket.serializeAttachment(idle(entry.seeker));
       send(entry.socket, { type: 'matched', gameId, color });
@@ -131,6 +147,9 @@ interface WaitingEntry {
   readonly socket: WebSocket;
   readonly seeker: Seeker;
 }
+
+const seat = (seeker: Seeker): SeatedPlayer => ({ id: seeker.userId, username: seeker.username, member: seeker.member });
+const botSeat = (level: number): SeatedPlayer => ({ id: `bot-${level}`, username: `봇 ${level}단`, member: false, bot: level });
 
 /** 줄·방에서 빠진 상태 */
 const idle = (seeker: Seeker): Seeker => ({ userId: seeker.userId, username: seeker.username, member: seeker.member });
@@ -162,7 +181,7 @@ export function findPairs(seekers: readonly Seeker[], now: number): [number, num
   return pairs;
 }
 
-const MESSAGE_TYPES = new Set(['seek', 'createRoom', 'joinRoom', 'cancel']);
+const MESSAGE_TYPES = new Set(['seek', 'createRoom', 'joinRoom', 'playBot', 'cancel']);
 
 function parseMessage(raw: string | ArrayBuffer): LobbyClientMessage | null {
   if (typeof raw !== 'string') return null;
