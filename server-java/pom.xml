@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 체스업 Java 서버: Spring Boot + jOOQ + Flyway + PostgreSQL · 약속은 ../docs/api.yaml · 표는 ../docs/schema.md -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.2.0</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.chessup</groupId>
+  <artifactId>chessup-server</artifactId>
+  <version>0.1.0</version>
+
+  <properties>
+    <java.version>21</java.version>
+    <!-- 코드 생성용 DB(compose.yaml) -->
+    <codegen.url>jdbc:postgresql://localhost:54329/chessup</codegen.url>
+    <codegen.user>chessup</codegen.user>
+    <codegen.password>chessup</codegen.password>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jooq</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- mvn spring-boot:run 하면 compose.yaml 의 PostgreSQL 을 띄우고 연결 정보도 채움 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-docker-compose</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- 생성된 jOOQ 코드(src/main/jooq, git 에 올림)를 소스로 -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-jooq-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/main/jooq</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- 표가 바뀌면: docker compose up -d && mvn -Pcodegen generate-sources
+         실제 PostgreSQL 에 Flyway 로 마이그레이션을 적용한 뒤, 그 구조를 읽어 src/main/jooq 를 다시 만듦 -->
+    <profile>
+      <id>codegen</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-maven-plugin</artifactId>
+            <version>${flyway.version}</version>
+            <executions>
+              <execution>
+                <id>migrate-for-codegen</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>clean</goal>
+                  <goal>migrate</goal>
+                </goals>
+              </execution>
+            </executions>
+            <dependencies>
+              <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+              </dependency>
+              <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <url>${codegen.url}</url>
+              <user>${codegen.user}</user>
+              <password>${codegen.password}</password>
+              <locations>
+                <location>filesystem:src/main/resources/db/migration</location>
+              </locations>
+              <cleanDisabled>false</cleanDisabled>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-codegen-maven</artifactId>
+            <version>${jooq.version}</version>
+            <executions>
+              <execution>
+                <id>jooq-codegen</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>generate</goal>
+                </goals>
+              </execution>
+            </executions>
+            <dependencies>
+              <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <jdbc>
+                <url>${codegen.url}</url>
+                <user>${codegen.user}</user>
+                <password>${codegen.password}</password>
+              </jdbc>
+              <generator>
+                <database>
+                  <name>org.jooq.meta.postgres.PostgresDatabase</name>
+                  <inputSchema>public</inputSchema>
+                  <excludes>flyway_schema_history</excludes>
+                </database>
+                <generate>
+                  <records>true</records>
+                  <pojos>false</pojos>
+                  <javaTimeTypes>true</javaTimeTypes>
+                </generate>
+                <target>
+                  <packageName>com.chessup.db</packageName>
+                  <directory>src/main/jooq</directory>
+                </target>
+              </generator>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

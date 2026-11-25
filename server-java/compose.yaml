@@ -1,0 +1,10 @@
+# 로컬 PostgreSQL: 서버 실행(Spring Boot 가 자동으로 띄움)과 jOOQ 코드 생성(mvn -Pcodegen)에 씀
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: chessup
+      POSTGRES_USER: chessup
+      POSTGRES_PASSWORD: chessup
+    ports:
+      - "54329:5432"

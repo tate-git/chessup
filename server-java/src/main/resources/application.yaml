@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: chessup
+  jooq:
+    sql-dialect: postgres
