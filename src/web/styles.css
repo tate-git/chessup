@@ -171,7 +171,7 @@ a.button.wide { display: block; }
 
 /* ───────── 대국 */
 .play {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 10px 12px 24px;
 }
@@ -190,6 +190,17 @@ a.button.wide { display: block; }
   grid-template-columns: minmax(0, 1fr);
 
   @media (min-width: 860px) { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+
+  /* 넓은 화면: 판을 화면 가운데에, 옆 칸은 판 오른쪽 · 왼쪽은 같은 폭 빈칸 */
+  @media (min-width: 1200px) {
+    --side: 280px;
+    --room: calc(min(100vw, 1400px) - 24px - 2 * (var(--side) + 14px));
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    & > :first-child { grid-column: 2; }
+    & > .side { grid-column: 3; width: var(--side); }
+    & > .board-wrap { width: min(var(--room), calc(100dvh - 90px)); }
+    & > .board-column { width: min(var(--room), calc(100dvh - 170px)); }
+  }
 }
 
 .board-wrap {
