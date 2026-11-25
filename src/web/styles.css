@@ -200,7 +200,19 @@ a.button.wide { display: block; }
     & > .side { grid-column: 3; width: var(--side); }
     & > .board-wrap { width: min(var(--room), calc(100dvh - 90px)); }
     & > .board-column { width: min(var(--room), calc(100dvh - 170px)); }
-    & > .board-stack { width: min(var(--room), calc(100dvh - 120px)); }
+    & > .board-stack { width: min(var(--room), calc(100dvh - 190px)); }
+  }
+}
+
+/* 연습: 옆 칸은 수 목록뿐이라 좁게 → 860px 부터 판을 화면 가운데로 */
+@media (min-width: 860px) {
+  .table.practice {
+    --side: 200px;
+    --room: calc(min(100vw, 1400px) - 24px - 2 * (var(--side) + 14px));
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    & > :first-child { grid-column: 2; }
+    & > .side { grid-column: 3; width: var(--side); }
+    & > .board-stack { width: min(var(--room), calc(100dvh - 190px)); }
   }
 }
 
@@ -209,11 +221,11 @@ a.button.wide { display: block; }
   margin: 0 auto;
 }
 
-/* 연습: 판 바로 아래 상태 글자(내 차례 · 생각 중 · 대국 끝) */
+/* 연습: 판 · 바로 아래 상태 글자(내 차례 · 생각 중 · 대국 끝) · 버튼 넷 */
 .board-stack {
   display: grid;
   gap: 8px;
-  width: min(100%, calc(100dvh - 120px));
+  width: min(100%, calc(100dvh - 190px));
   margin: 0 auto;
 
   & .board-wrap { width: 100%; }
@@ -246,13 +258,14 @@ a.button.wide { display: block; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 8px; }
 
-/* 연습 화면: 상태 · 힌트 · 무르기 · 뒤집기 · 기권을 세로 한 줄로 */
-.toolbar {
+/* 연습: 판 아래 버튼 넷 가로 한 줄(아이콘 위 · 이름 아래) */
+.board-actions {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 
-  & .controls { display: grid; gap: 8px; }
-  & .controls button { width: 100%; }
+  & button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; font-size: 13px; white-space: nowrap; }
+  & .action-icon { font-size: 18px; line-height: 1; }
 }
 .controls[hidden] { display: none; }
 
@@ -424,3 +437,6 @@ dialog {
   &.running.low { background: #d6336c; }
 }
 .rating-change { font-size: 20px; font-weight: 700; &.up { color: var(--accent); } &.down { color: #d6336c; } }
+
+/* 연습: 첫 수 전에는 빈 수 목록 칸을 숨김 */
+.table.practice > .side:has(.moves:empty) { display: none; }

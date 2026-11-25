@@ -24,3 +24,6 @@ export function moveListHtml(sans: readonly string[]): string {
   }
   return rows.join('');
 }
+
+/** 판 아래 버튼 글자: 아이콘 위 · 이름 아래(안에 넣는 글은 이 앱이 만든 고정 문구) */
+export const actionLabel = (icon: string, label: string) => `<span class="action-icon" aria-hidden="true">${icon}</span><span>${label}</span>`;

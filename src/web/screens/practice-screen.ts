@@ -5,7 +5,7 @@ import { t } from '../i18n';
 import { PracticeSession, type PracticeOutcome } from '../practice';
 import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
-import { query } from '../ui/dom';
+import { actionLabel, query } from '../ui/dom';
 import { endReasonLabel, variantLabel } from './labels';
 import type { Screen } from './screen';
 
@@ -24,20 +24,18 @@ export const practiceScreen = (level: number): Screen => async root => {
         <a href="#/" class="back">← ${t('홈', 'Home')}</a>
         <span>${variantLabel(variant)} · 🤖 ${t(`봇 ${level}단`, `Bot level ${level}`)}</span>
       </header>
-      <div class="table">
+      <div class="table practice">
         <div class="board-stack">
           <div class="board-wrap"><div id="board"></div></div>
           <p id="status" class="status"></p>
+          <div class="board-actions">
+            <button type="button" id="hint"></button>
+            <button type="button" id="undo"></button>
+            <button type="button" data-action="flip">${actionLabel('🔄', t('뒤집기', 'Flip'))}</button>
+            <button type="button" data-action="resign">${actionLabel('🏳️', t('기권', 'Resign'))}</button>
+          </div>
         </div>
         <aside class="side">
-          <div class="toolbar">
-            <div class="controls">
-              <button type="button" id="hint"></button>
-              <button type="button" id="undo"></button>
-              <button type="button" data-action="flip">🔄 ${t('뒤집기', 'Flip')}</button>
-              <button type="button" data-action="resign">🏳️ ${t('기권', 'Resign')}</button>
-            </div>
-          </div>
           <ol id="moves" class="moves"></ol>
         </aside>
       </div>

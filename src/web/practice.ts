@@ -5,7 +5,7 @@ import { engine } from './engine-client';
 import { t } from './i18n';
 import type { HintSource } from './hints';
 import { recordClear } from './practice-record';
-import { moveListHtml } from './ui/dom';
+import { actionLabel, moveListHtml } from './ui/dom';
 import { BoardView } from './ui/board-view';
 import { pickPromotion } from './ui/promotion-picker';
 
@@ -165,9 +165,9 @@ export class PracticeSession {
   #updateButtons(): void {
     const hints = this.setup.hints.remaining;
     this.view.hintButton.disabled = hints <= 0 || !this.#isPlayerTurn();
-    this.view.hintButton.textContent = `💡 ${t('힌트', 'Hint')} ${Math.max(0, hints)}`;
+    this.view.hintButton.innerHTML = actionLabel('💡', `${t('힌트', 'Hint')} ${Math.max(0, hints)}`);
     this.view.undoButton.disabled = !this.#canUndo();
-    this.view.undoButton.textContent = `↩️ ${t('무르기', 'Undo')} ${this.#undosLeft}`;
+    this.view.undoButton.innerHTML = actionLabel('↩️', `${t('무르기', 'Undo')} ${this.#undosLeft}`);
     const note = t('한 판에 3번 · 쓰고 이기면 격파에 🤝 표시', '3 per game · wins using it are marked 🤝');
     this.view.hintButton.title = note;
     this.view.undoButton.title = note;
