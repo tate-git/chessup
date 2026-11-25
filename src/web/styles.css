@@ -54,6 +54,7 @@ button, a.button {
 
   &:disabled { opacity: 0.45; cursor: default; }
   &.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  &.danger { background: #d6336c; color: #ffffff; border-color: transparent; }
   &.ghost { background: transparent; }
 }
 
@@ -130,7 +131,7 @@ button, a.button {
 
   & button { flex: 1; border: 0; background: transparent; }
   & button[aria-selected='true'] { background: var(--panel); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
-  &.small button { padding: 6px 8px; font-size: 14px; }
+  &.small button { flex: 1 1 auto; padding: 6px 6px; font-size: 14px; white-space: nowrap; }   /* 긴 이름(나중에 두기)이 줄바꿈되지 않게 글자만큼 나눔 */
 }
 
 .card {
@@ -422,6 +423,17 @@ dialog {
   & p { margin: 0 0 12px; }
   & .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   & .wide + .row { margin-top: 10px; }   /* 큰 버튼 아래 취소와 붙지 않게 */
+  & .row button { min-width: 96px; }
+
+  /* 열릴 때 살짝 떠오르며 나타남 · 배경도 부드럽게 */
+  &[open] { animation: dialog-in 0.18s ease-out; }
+  &[open]::backdrop { animation: backdrop-in 0.18s ease-out; }
+}
+
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+@keyframes backdrop-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .result[open], .result[open]::backdrop { animation: none; }
 }
 
 .result-icon { font-size: 52px; margin: 0; }

@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { PracticeSession, type PracticeOutcome } from '../practice';
 import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
+import { askResign } from '../ui/ask-resign';
 import { actionLabel, query } from '../ui/dom';
 import { endReasonLabel, variantLabel } from './labels';
 import type { Screen } from './screen';
@@ -64,7 +65,9 @@ export const practiceScreen = (level: number): Screen => async root => {
   query(root, '#hint').onclick = () => void session.hint();
   query(root, '#undo').onclick = () => session.undo();
   query(root, '[data-action="flip"]').onclick = () => session.flip();
-  query(root, '[data-action="resign"]').onclick = () => session.resign();
+  query(root, '[data-action="resign"]').onclick = async () => {
+    if (await askResign()) session.resign();
+  };
 };
 
 function showResult(root: HTMLElement, level: number, { status, won, assisted, newClear, newUnassistedClear }: PracticeOutcome): void {

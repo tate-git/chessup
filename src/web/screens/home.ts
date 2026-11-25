@@ -7,12 +7,14 @@ import { createRoom, joinRoom, roomLink, seek, type LobbyConnection } from '../l
 import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
 import { escapeHtml, query } from '../ui/dom';
+import { noticeDialog } from '../ui/app-dialog';
 import { mountLevelWheel } from '../ui/level-wheel';
 import { ratingText, timeControlHint, timeControlLabel, variantLabel } from './labels';
 import { navigate, type Screen } from './screen';
 
 const COLOR_CHOICES: readonly ColorChoice[] = ['white', 'black', 'random'];
-const colorLabel = (choice: ColorChoice) => ({ white: t('⚪ 백으로', '⚪ White'), black: t('⚫ 흑으로', '⚫ Black'), random: t('🎲 무작위', '🎲 Random') })[choice];
+/** 봇 연습 색 고르기: 흰 말이 먼저 두니 순서로 말함 */
+const colorLabel = (choice: ColorChoice) => ({ white: t('⚪ 먼저 두기', '⚪ Move first'), black: t('⚫ 나중에 두기', '⚫ Move second'), random: t('🎲 랜덤', '🎲 Random') })[choice];
 
 /** 사람을 못 찾으면 몇 초 뒤 봇과 */
 const BOT_FALLBACK_SECONDS = 15;
@@ -202,7 +204,7 @@ export const homeScreen: Screen = async root => {
   };
 
   const enterRoom = async (code: string) => {
-    if (!/^\d{4}$/.test(code)) return alert(t('방 번호는 숫자 네 자리예요', 'Room numbers are four digits'));
+    if (!/^\d{4}$/.test(code)) return noticeDialog('🔑', t('방 번호는 숫자 네 자리예요', 'Room numbers are four digits'), t('확인', 'OK'));
     await ensurePlayer();
     const dialog = waitDialog('🚪', t(`방 ${code}에 들어가는 중…`, `Joining room ${code}…`), '');
     lobby = joinRoom(code, {

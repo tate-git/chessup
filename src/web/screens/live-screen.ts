@@ -3,6 +3,7 @@ import type { Color, GameSummary } from '../../shared/protocol';
 import { t } from '../i18n';
 import { LiveSession } from '../live-session';
 import { session } from '../session';
+import { askResign } from '../ui/ask-resign';
 import { actionLabel, query } from '../ui/dom';
 import { endReasonLabel, timeControlLabel, variantLabel } from './labels';
 import type { Screen } from './screen';
@@ -50,7 +51,7 @@ export const liveScreen = (gameId: string): Screen => root => {
   });
   root.onclick = event => {
     const action = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action;
-    if (action === 'resign' && confirm(t('기권할까요?', 'Resign this game?'))) live.resign();
+    if (action === 'resign') void askResign().then(yes => yes && live.resign());
     if (action === 'offer') live.offerDraw();
     if (action === 'accept') live.answerDraw(true);
     if (action === 'decline') live.answerDraw(false);
@@ -74,5 +75,5 @@ function showResult(root: HTMLElement, summary: GameSummary, you: Color | 'spect
     ${changeText}
     <div class="row"><a class="button primary" href="#/">${t('홈으로', 'Home')}</a></div>`;
   dialog.showModal();
-  void session.refresh();   // 바뀐 레이팅 반영
+  void session.refresh().catch(() => undefined);   // 바뀐 레이팅 반영(그사이 화면을 떠나면 그만)
 }
