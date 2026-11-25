@@ -102,9 +102,10 @@ export const homeScreen: Screen = async root => {
   };
 
   /** 찾는 중 · 방 기다리는 중 창 */
-  const waitDialog = (icon: string, title: string, body: string) => {
+  /** 아이콘 · 제목 · body · 상태 줄(#seek-info) · footer · 취소 */
+  const waitDialog = (icon: string, title: string, body: string, footer = '') => {
     const dialog = query<HTMLDialogElement>(root, '#seeking');
-    dialog.innerHTML = `<p class="result-icon">${icon}</p><h2>${title}</h2>${body}<p class="muted" id="seek-info"></p><div class="row"><button type="button" data-action="cancel-seek">${t('취소', 'Cancel')}</button></div>`;
+    dialog.innerHTML = `<p class="result-icon">${icon}</p><h2>${title}</h2>${body}<p class="muted" id="seek-info"></p>${footer}<div class="row"><button type="button" data-action="cancel-seek">${t('취소', 'Cancel')}</button></div>`;
     if (!dialog.open) dialog.showModal();
     return dialog;
   };
@@ -153,9 +154,10 @@ export const homeScreen: Screen = async root => {
   const startSeeking = async (timeControl: TimeControl) => {
     const guestName = await ensurePlayer();
     const label = `${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)}${guestName ? ` · ${guestName}` : ''}`;
-    const dialog = waitDialog('🔎', t('상대를 찾는 중…', 'Finding an opponent…'),
-      `<button type="button" class="primary wide" data-action="play-bot">🤖 ${t('봇과 바로 두기', 'Play a bot now')}</button>
-       <p class="muted small" id="bot-countdown"></p>`);
+    // 위: 찾는 조건·대기 인원 → 초읽기 → 아래: 봇과 바로 두기 · 취소
+    const dialog = waitDialog('🔎', t('상대를 찾는 중…', 'Finding an opponent…'), '',
+      `<p class="muted small" id="bot-countdown"></p>
+       <button type="button" class="primary wide" data-action="play-bot">🤖 ${t('봇과 바로 두기', 'Play a bot now')}</button>`);
     query(dialog, '#seek-info').textContent = label;
     lobby = seek(settings.variant, timeControl, {
       onQueued: waiting => (query(dialog, '#seek-info').textContent = `${label} · ${t(`대기 ${waiting}명`, `${waiting} waiting`)}`),

@@ -410,6 +410,7 @@ dialog {
   & h2 { margin: 4px 0; font-size: 28px; }
   & p { margin: 0 0 12px; }
   & .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  & .wide + .row { margin-top: 10px; }   /* 큰 버튼 아래 취소와 붙지 않게 */
 }
 
 .result-icon { font-size: 52px; margin: 0; }
