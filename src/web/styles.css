@@ -10,6 +10,7 @@
   --accent-ink: #ffffff;
   --square-light: #f0d9b5;
   --square-dark: #b58863;
+  --board-frame: #5c3a21;
   --highlight: rgb(255 214 10 / 0.45);
   --check: radial-gradient(circle, rgb(255 40 40 / 0.85) 0%, rgb(255 40 40 / 0) 70%);
   --radius: 14px;
@@ -227,7 +228,8 @@ a.button.wide { display: block; }
 .board {
   position: relative;
   aspect-ratio: var(--files) / var(--ranks);
-  border-radius: 6px;
+  border: 8px solid var(--board-frame);
+  border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
   user-select: none;
