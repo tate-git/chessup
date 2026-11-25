@@ -78,9 +78,9 @@ export const homeScreen: Screen = async root => {
     const heading = rating ? ` <span class="rating">${ratingText(rating.rating, rating.provisional)}</span>` : '';
     const intro = rating
       ? t(`${rating.games}판 · ${rating.wins}승 ${rating.losses}패 ${rating.draws}무`, `${rating.games} games · ${rating.wins}W ${rating.losses}L ${rating.draws}D`)
-      : t('가입 없이 게스트로 바로 둬요 · 레이팅은 로그인하면 쌓여요', 'Play right away as a guest · log in to keep a rating');
+      : t('랭킹을 기록하고 싶다면 로그인해 주세요.', 'Log in to record your ranking.');
     return `<article class="card ranked">
-      <h2>⚔️ ${t('대국', 'Play')}${heading}</h2>
+      <h2>⚔️ ${t('랭킹 대결', 'Ranked match')}${heading}</h2>
       <p class="muted">${intro}</p>
       <div class="time-controls">${TIME_CONTROLS[variant].map(tc => `<button type="button" class="primary" data-seek="${tc}" title="${timeControlHint(tc)}">⏱ ${timeControlLabel(tc)}</button>`).join('')}</div>
       <div class="room-row">
