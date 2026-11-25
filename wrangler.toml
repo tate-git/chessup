@@ -12,7 +12,8 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "chessup"
-database_id = "local-placeholder"   # 배포 전에 `wrangler d1 create chessup` 결과로 바꿈
+database_id = "a2565adc-0859-4e3c-aa11-97ac6f4d6043"
+preview_database_id = "local-placeholder"   # 로컬(wrangler dev)은 예전 로컬 DB 그대로
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
