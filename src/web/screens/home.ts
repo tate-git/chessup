@@ -27,11 +27,15 @@ export const homeScreen: Screen = async root => {
     root.innerHTML = `
       <section class="home">
         <nav class="topnav">
-          <a href="#/leaderboard">🏆 ${t('랭킹', 'Ranking')}</a>
-          ${session.me ? `<span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : ''}
-          ${guest ? `<button type="button" class="me" data-action="rename" title="${t('게스트 이름 바꾸기', 'Change guest name')}">👤 <b>${escapeHtml(guest.username)}</b></button>` : ''}
-          ${session.me ? '' : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
-          <button type="button" data-action="lang" class="ghost">${t('🌐 English', '🌐 한국어')}</button>
+          <div class="nav-group">
+            ${session.me ? `<span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : ''}
+            ${guest ? `<button type="button" class="me" data-action="rename" title="${t('게스트 이름 바꾸기', 'Change guest name')}">👤 <b>${escapeHtml(guest.username)}</b></button>` : ''}
+            ${session.me ? '' : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
+          </div>
+          <div class="nav-group">
+            <a href="#/leaderboard">🏆 ${t('랭킹', 'Ranking')}</a>
+            <button type="button" data-action="lang" class="ghost">${t('🌐 English', '🌐 한국어')}</button>
+          </div>
         </nav>
         <header class="hero">
           <img src="/piece/ln.svg" alt="" class="hero-piece">
@@ -81,7 +85,7 @@ export const homeScreen: Screen = async root => {
       <div class="room-row">
         <button type="button" data-action="room">🔑 ${t('방 만들기', 'Create room')}</button>
         <form class="join-room" novalidate>
-          <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="${t('방 번호', 'Room no.')}" aria-label="${t('방 번호', 'Room number')}" autocomplete="off">
+          <input name="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" size="4" placeholder="${t('방 번호', 'Room no.')}" aria-label="${t('방 번호', 'Room number')}" autocomplete="off">
           <button type="submit">${t('들어가기', 'Join')}</button>
         </form>
       </div>

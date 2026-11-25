@@ -74,15 +74,17 @@ button, a.button {
 }
 
 .topnav {
+  /* 왼쪽: 내 이름 · 로그인/로그아웃 · 오른쪽: 랭킹 · 언어 */
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
   font-size: 14px;
 
+  & .nav-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
   /* 링크·버튼·아이디 모두 같은 높이의 알약 모양(종류가 달라도 줄이 맞게) */
-  & > * {
+  & .nav-group > * {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -101,7 +103,7 @@ button, a.button {
 
 /* 좁은 폰: 로그인 상태(4개)도 한 줄에 들어가게 조금 촘촘히 */
 @media (max-width: 420px) {
-  .topnav > * { padding: 0 8px; font-size: 13px; }
+  .topnav .nav-group > * { padding: 0 8px; font-size: 13px; }
 }
 
 .hero {
@@ -418,7 +420,8 @@ dialog {
   gap: 6px;
   min-width: 0;
 
-  & input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); letter-spacing: 0.15em; }
+  /* 기본 20칸 너비가 카드를 화면 밖으로 밀어서 0 에서 늘어나게 */
+  & input { flex: 1 1 0; width: 0; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); letter-spacing: 0.15em; }
 }
 .room-code { margin: 4px 0; font-size: 44px; font-weight: 800; letter-spacing: 0.2em; text-align: center; }
 .room-join { text-align: center; }
