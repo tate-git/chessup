@@ -181,7 +181,9 @@ export class LiveSession {
     this.view.bottomPlayer.innerHTML = player(bottom);
     this.view.moves.innerHTML = moveListHtml(game.history.map(played => played.san));
     this.view.moves.scrollTop = this.view.moves.scrollHeight;
-    if (!this.#ended) this.view.status.textContent = this.#mySideToMove() !== null ? t('내 차례', 'Your move') : state.you === 'spectator' ? t('관전 중', 'Spectating') : t('상대 차례', "Opponent's move");
+    // 내 차례는 글자 대신 판 테두리로 알림(봇 연습과 같음) · 글자는 관전·무승부 제안 같은 안내만
+    this.view.board.classList.toggle('my-turn', this.#mySideToMove() !== null);
+    if (!this.#ended) this.view.status.textContent = state.you === 'spectator' ? t('관전 중', 'Spectating') : '';
     this.#renderClocks();
   }
 

@@ -498,8 +498,9 @@ dialog {
 
 /* ───────── 실시간 대국 */
 .board-column { display: grid; gap: 6px; width: min(100%, calc(100dvh - 250px)); margin: 0 auto; }
-/* 대결: 판 아래 상태(내 차례 · 상대 차례) 가운데 */
+/* 대결: 판 아래 안내(관전 중 · 무승부 제안) 가운데 · 없으면 자리도 안 차지 */
 .board-column .status { text-align: center; }
+.board-column .status:empty { display: none; }
 .board-column .board-wrap { width: 100%; }
 .player-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .clock {
