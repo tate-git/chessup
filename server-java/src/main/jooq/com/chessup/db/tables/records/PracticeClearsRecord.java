@@ -63,6 +63,20 @@ public class PracticeClearsRecord extends UpdatableRecordImpl<PracticeClearsReco
         return (Integer) get(2);
     }
 
+    /**
+     * Setter for <code>public.practice_clears.unassisted_level</code>.
+     */
+    public void setUnassistedLevel(Integer value) {
+        set(3, value);
+    }
+
+    /**
+     * Getter for <code>public.practice_clears.unassisted_level</code>.
+     */
+    public Integer getUnassistedLevel() {
+        return (Integer) get(3);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -86,12 +100,13 @@ public class PracticeClearsRecord extends UpdatableRecordImpl<PracticeClearsReco
     /**
      * Create a detached, initialised PracticeClearsRecord
      */
-    public PracticeClearsRecord(UUID userId, Variant variant, Integer level) {
+    public PracticeClearsRecord(UUID userId, Variant variant, Integer level, Integer unassistedLevel) {
         super(PracticeClears.PRACTICE_CLEARS);
 
         setUserId(userId);
         setVariant(variant);
         setLevel(level);
+        setUnassistedLevel(unassistedLevel);
         resetTouchedOnNotNull();
     }
 }

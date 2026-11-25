@@ -75,6 +75,11 @@ public class PracticeClears extends TableImpl<PracticeClearsRecord> {
      */
     public final TableField<PracticeClearsRecord, Integer> LEVEL = createField(DSL.name("level"), SQLDataType.INTEGER.nullable(false), this, "");
 
+    /**
+     * The column <code>public.practice_clears.unassisted_level</code>.
+     */
+    public final TableField<PracticeClearsRecord, Integer> UNASSISTED_LEVEL = createField(DSL.name("unassisted_level"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.field(DSL.raw("0"), SQLDataType.INTEGER)), this, "");
+
     private PracticeClears(Name alias, Table<PracticeClearsRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
