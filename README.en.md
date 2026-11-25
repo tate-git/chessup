@@ -19,7 +19,7 @@ A web game for climbing the ratings in standard chess and mini chess (Los Alamos
 - Guests can play right away without signing up. Members and guests share one queue; only members keep a rating (guests count as 1500).
 - Rooms: share a four-digit room number (or link) with a friend and the game starts as soon as they join.
 - Rankings: "This week" (from Monday 00:00 KST, points: win 1, draw 0.5, guests included) and "All time" (rating, members). Guests pick a name before their first game and keep this week's results if they sign up.
-- In bot games you get 3 hints and 3 undos per game. Levels won with help are marked 🤝; win again without help to clear the mark.
+- In bot games you get 3 hints and 3 take-backs per game. Levels won with help are marked 🤝; win again without help to clear the mark.
 
 ## Code map
 

@@ -163,7 +163,7 @@ paths:
               properties:
                 variant: { $ref: '#/components/schemas/VariantId' }
                 level: { type: integer, minimum: 1, maximum: 10 }
-                assisted: { type: boolean, default: false, description: 힌트·무르기를 썼는지(쓰면 도움 없이 깬 단계는 그대로) }
+                assisted: { type: boolean, default: false, description: 힌트·뒤로가기를 썼는지(쓰면 도움 없이 깬 단계는 그대로) }
       responses:
         '200': { description: 갱신된 기록, content: { application/json: { schema: { $ref: '#/components/schemas/PracticeState' } } } }
         '400': { $ref: '#/components/responses/InvalidInput' }
@@ -172,7 +172,7 @@ paths:
   /api/practice/hints:
     post:
       tags: [practice]
-      summary: 힌트 한 번 쓰기(누구나 한 판 3번 · 무르기 3번은 화면에서만 셈)
+      summary: 힌트 한 번 쓰기(누구나 한 판 3번 · 뒤로가기 3번은 화면에서만 셈)
       security: [{ cookieAuth: [] }]
       requestBody:
         required: true
@@ -337,8 +337,8 @@ components:
       type: object
       required: [cleared, unassisted]
       properties:
-        cleared: { $ref: '#/components/schemas/ClearLevels', description: 깬 최고 단계(힌트·무르기 써도 포함) }
-        unassisted: { $ref: '#/components/schemas/ClearLevels', description: 힌트·무르기 없이 깬 최고 단계 · cleared 보다 낮은 단계는 화면에 🤝 }
+        cleared: { $ref: '#/components/schemas/ClearLevels', description: 깬 최고 단계(힌트·뒤로가기 써도 포함) }
+        unassisted: { $ref: '#/components/schemas/ClearLevels', description: 힌트·뒤로가기 없이 깬 최고 단계 · cleared 보다 낮은 단계는 화면에 🤝 }
 
     PlayerInfo:
       type: object

@@ -277,7 +277,7 @@ export const homeScreen: Screen = async root => {
   return stopSeeking;
 };
 
-/** 도움 없이 깬 단계 ✓ · 힌트·무르기로만 깬 단계 ✓🤝 */
+/** 도움 없이 깬 단계 ✓ · 힌트·뒤로가기로만 깬 단계 ✓🤝 */
 function clearMark(level: number, cleared: number, unassisted: number): string {
   if (level <= unassisted) return '✓';
   return level <= cleared ? '✓🤝' : '';

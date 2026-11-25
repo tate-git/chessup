@@ -1,4 +1,4 @@
-// 봇과 연습: 내가 두면 → 봇이 생각해서 둠 → 끝나면 결과 · 힌트·무르기(한 판 3번씩) · 판 뒤집기 · 기권
+// 봇과 연습: 내가 두면 → 봇이 생각해서 둠 → 끝나면 결과 · 힌트·뒤로가기(한 판 3번씩) · 판 뒤집기 · 기권
 import { Game, opponent, PAWN, typeOf, WHITE, winnerOf, type GameStatus, type Side, type VariantId } from '../engine';
 import { UNDOS_PER_GAME } from '../shared/protocol';
 import { engine } from './engine-client';
@@ -32,7 +32,7 @@ export interface PracticeView {
 export interface PracticeOutcome {
   readonly status: Extract<GameStatus, { over: true }> | { over: true; result: '1-0' | '0-1'; reason: 'resign' };
   readonly won: boolean;
-  /** 힌트나 무르기를 한 번이라도 썼는지 */
+  /** 힌트나 뒤로가기를 한 번이라도 썼는지 */
   readonly assisted: boolean;
   readonly newClear: boolean;
   /** 도움 없이는 처음 깸(전에 도움 받고 깬 단계 포함) */
@@ -169,7 +169,7 @@ export class PracticeSession {
     this.view.hintButton.disabled = hints <= 0 || !this.#isPlayerTurn();
     this.view.hintButton.innerHTML = actionLabel('💡', `${t('힌트', 'Hint')} ${Math.max(0, hints)}`);
     this.view.undoButton.disabled = !this.#canUndo();
-    this.view.undoButton.innerHTML = actionLabel('↩️', `${t('무르기', 'Undo')} ${this.#undosLeft}`);
+    this.view.undoButton.innerHTML = actionLabel('↩️', `${t('뒤로가기', 'Take back')} ${this.#undosLeft}`);
     const note = t('한 판에 3번 · 쓰고 이기면 격파에 🤝 표시', '3 per game · wins using it are marked 🤝');
     this.view.hintButton.title = note;
     this.view.undoButton.title = note;

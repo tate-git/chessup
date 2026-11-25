@@ -31,7 +31,7 @@ export const practiceScreen = (level: number): Screen => async root => {
           <div class="board-actions">
             <button type="button" id="hint"></button>
             <button type="button" id="undo"></button>
-            <button type="button" data-action="flip">${actionLabel('🔄', t('뒤집기', 'Flip'))}</button>
+            <button type="button" data-action="flip">${actionLabel('🔄', t('판 뒤집기', 'Flip board'))}</button>
             <button type="button" data-action="resign">${actionLabel('🏳️', t('기권', 'Resign'))}</button>
           </div>
         </div>
@@ -87,7 +87,7 @@ function showResult(root: HTMLElement, level: number, { status, won, assisted, n
 /** 결과 아래 한 줄: 첫 격파 · 도움 없이 첫 격파 · 도움 받아 이김 */
 function clearNote(level: number, assisted: boolean, newClear: boolean, newUnassistedClear: boolean): string {
   if (newUnassistedClear) return ` · ${t(`봇 ${level}단 도움 없이 격파!`, `Level ${level} cleared on your own!`)}`;
-  if (newClear) return ` · ${t(`봇 ${level}단 첫 격파 🤝(힌트·무르기 사용)`, `Level ${level} cleared 🤝 (with help)`)}`;
+  if (newClear) return ` · ${t(`봇 ${level}단 첫 격파 🤝(힌트·뒤로가기 사용)`, `Level ${level} cleared 🤝 (with help)`)}`;
   if (assisted) return ` · ${t('도움 없이 이기면 🤝 표시가 사라져요', 'Win without help to drop the 🤝')}`;
   return '';
 }
