@@ -81,7 +81,10 @@ button, a.button {
   gap: 6px;
   font-size: 14px;
 
+  min-width: 0;   /* 홈(그리드) 안에서 내용만큼 늘어나 화면을 넘지 않게 */
+
   & .nav-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  & .nav-group:last-child { flex-shrink: 0; }   /* 랭킹·언어는 그대로, 모자라면 왼쪽(이름)이 줄어듦 */
 
   /* 링크·버튼·아이디 모두 같은 높이의 알약 모양(종류가 달라도 줄이 맞게) */
   & .nav-group > * {
@@ -98,7 +101,10 @@ button, a.button {
     line-height: 1;
     text-decoration: none;
   }
-  & .me b { font-weight: 600; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .me b { font-weight: 600; max-width: 64px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 알약 안 글자는 줄바꿈 없이 · 폭이 모자라면 이름 알약만 줄어 「…」 */
+  & .nav-group > * { white-space: nowrap; flex-shrink: 0; }
+  & .nav-group > .me { flex-shrink: 1; min-width: 0; overflow: hidden; }
 }
 
 /* 좁은 폰: 로그인 상태(4개)도 한 줄에 들어가게 조금 촘촘히 */

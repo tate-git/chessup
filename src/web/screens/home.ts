@@ -34,8 +34,8 @@ export const homeScreen: Screen = async root => {
         <nav class="topnav">
           <div class="nav-group">
             ${session.me
-              ? `<button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button><span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span>`
-              : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
+              ? `<button type="button" data-action="logout" class="ghost">🚪 ${t('로그아웃', 'Log out')}</button><span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span>`
+              : `<a href="#/login" class="login-link">🔑 ${t('로그인', 'Log in')}</a>`}
             ${guest ? `<button type="button" class="me" data-action="rename" title="${t('게스트 이름 바꾸기', 'Change guest name')}">👤 <b>${escapeHtml(guest.username)}</b></button>` : ''}
           </div>
           <div class="nav-group">
