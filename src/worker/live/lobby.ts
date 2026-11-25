@@ -1,4 +1,4 @@
-// 매칭 로비(Durable Object · 하나): 같은 종목·시간끼리, 레이팅 차이가 허용 범위면 짝 — 오래 기다릴수록 범위가 넓어짐
+// 매칭 로비(Durable Object · 하나): 같은 종목·시간·(랭크/친선)끼리 · 랭크는 레이팅 차이가 허용 범위면 짝(오래 기다릴수록 넓어짐) · 친선은 레이팅 안 봄 · 게스트는 친선만
 import { DurableObject } from 'cloudflare:workers';
 import { isVariantId } from '../../engine/variants';
 import { TIME_CONTROLS, type LobbyClientMessage, type LobbyServerMessage, type TimeControl } from '../../shared/protocol';
@@ -10,7 +10,8 @@ import type { Env } from '../env';
 interface Seeker {
   readonly userId: string;
   readonly username: string;
-  seek?: { readonly variant: VariantId; readonly timeControl: TimeControl; readonly rating: number; readonly since: number };
+  readonly member: boolean;
+  seek?: { readonly variant: VariantId; readonly timeControl: TimeControl; readonly rated: boolean; readonly rating: number; readonly since: number };
 }
 
 const BASE_WINDOW = 150;
@@ -26,7 +27,7 @@ export class Lobby extends DurableObject<Env> {
     if (!userId || !username) return new Response('unauthorized', { status: 401 });
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId, username } satisfies Seeker);
+    server.serializeAttachment({ userId, username: decodeURIComponent(username), member: request.headers.get('X-Member') === '1' } satisfies Seeker);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -42,9 +43,11 @@ export class Lobby extends DurableObject<Env> {
     if (!isVariantId(message.variant) || !TIME_CONTROLS[message.variant].includes(message.timeControl)) {
       return send(socket, { type: 'error', code: 'invalid_input', message: '종목·시간을 확인해 주세요' });
     }
+    const rated = message.rated !== false;
+    if (rated && !seeker.member) return send(socket, { type: 'error', code: 'unauthorized', message: '랭크 대국은 로그인해야 둘 수 있어요. 게스트는 친선 대국만 돼요' });
     this.#dropOtherSeeks(seeker.userId, socket);   // 같은 사람이 탭 여러 개로 줄 서지 않게
-    const rating = await loadRating(this.env.DB, seeker.userId, message.variant);
-    socket.serializeAttachment({ ...seeker, seek: { variant: message.variant, timeControl: message.timeControl, rating: rating.rating, since: Date.now() } });
+    const rating = rated ? (await loadRating(this.env.DB, seeker.userId, message.variant)).rating : 0;
+    socket.serializeAttachment({ ...seeker, seek: { variant: message.variant, timeControl: message.timeControl, rated, rating, since: Date.now() } });
     await this.#matchWaiting();
   }
 
@@ -72,13 +75,14 @@ export class Lobby extends DurableObject<Env> {
 
   async #startGame(a: WaitingEntry, b: WaitingEntry): Promise<void> {
     const [white, black] = Math.random() < 0.5 ? [a, b] : [b, a];
-    const { variant, timeControl } = a.seeker.seek!;
+    const { variant, timeControl, rated } = a.seeker.seek!;
     const gameId = crypto.randomUUID();
     const room = this.env.GAME_ROOM.get(this.env.GAME_ROOM.idFromName(gameId));
     await room.start({
       id: gameId,
       variant,
       timeControl,
+      rated,
       white: { id: white.seeker.userId, username: white.seeker.username },
       black: { id: black.seeker.userId, username: black.seeker.username },
     });
@@ -107,7 +111,7 @@ interface WaitingEntry {
   readonly seeker: Seeker;
 }
 
-const sameQueue = (a: Seeker, b: Seeker) => a.seek?.variant === b.seek?.variant && a.seek?.timeControl === b.seek?.timeControl;
+const sameQueue = (a: Seeker, b: Seeker) => a.seek?.variant === b.seek?.variant && a.seek?.timeControl === b.seek?.timeControl && a.seek?.rated === b.seek?.rated;
 
 /** 기다린 시간에 따라 넓어지는 레이팅 허용 범위 */
 export function ratingWindow(waitedMs: number): number {
@@ -125,7 +129,7 @@ export function findPairs(seekers: readonly Seeker[], now: number): [number, num
     const window = ratingWindow(now - me.seek!.since);
     const partner = order
       .filter(other => other !== index && !taken.has(other) && sameQueue(seekers[other], me) && seekers[other].userId !== me.userId)
-      .filter(other => Math.abs(seekers[other].seek!.rating - me.seek!.rating) <= Math.max(window, ratingWindow(now - seekers[other].seek!.since)))
+      .filter(other => !me.seek!.rated || Math.abs(seekers[other].seek!.rating - me.seek!.rating) <= Math.max(window, ratingWindow(now - seekers[other].seek!.since)))
       .sort((a, b) => Math.abs(seekers[a].seek!.rating - me.seek!.rating) - Math.abs(seekers[b].seek!.rating - me.seek!.rating))[0];
     if (partner === undefined) continue;
     taken.add(index).add(partner);

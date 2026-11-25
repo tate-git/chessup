@@ -37,6 +37,8 @@ export const api = {
   profile: (username: string) => call<Profile>('GET', `/api/users/${encodeURIComponent(username)}`),
   game: (id: string) => call<GameRecord>('GET', `/api/games/${encodeURIComponent(id)}`),
   practice: () => call<PracticeState>('GET', '/api/practice'),
+  /** 게스트 시작(쿠키) · 이미 있으면 같은 이름 */
+  guest: () => call<{ username: string }>('POST', '/api/auth/guest'),
   recordClear: (variant: VariantId, level: number, assisted: boolean) => call<PracticeState>('POST', '/api/practice/clears', { variant, level, assisted }),
   useHint: (practiceGameId: string) => call<HintAllowance>('POST', '/api/practice/hints', { practiceGameId }),
 };

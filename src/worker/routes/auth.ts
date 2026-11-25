@@ -1,7 +1,8 @@
-// 가입 · 로그인 · 로그아웃
+// 가입 · 로그인 · 로그아웃 · 게스트(가입 없이 친선 대국)
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../auth/password';
+import { startGuest } from '../auth/guest';
 import { endSession, startSession } from '../auth/session';
 import { clearFailures, ipKey, isLocked, recordFailure, userKey, type FailureKey } from '../db/login-limit';
 import { createUser, findUserByName, usernameKey } from '../db/users';
@@ -42,6 +43,10 @@ export const authRoutes = new Hono<AppEnv>()
     await clearFailures(context.env.DB, keys);
     await startSession(context, user.id);
     return context.json(await meOf(context.env.DB, user));
+  })
+  .post('/guest', async context => {
+    const { username } = await startGuest(context);
+    return context.json({ username });
   })
   .post('/logout', requireUser, async context => {
     await endSession(context);

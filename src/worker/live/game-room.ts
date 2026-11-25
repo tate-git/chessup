@@ -1,10 +1,10 @@
-// 대국방(Durable Object · 대국 하나에 하나): 수 검사 · 시계 · 무승부 제안 · 끝나면 레이팅 반영 · 접속한 모두에게 알림
+// 대국방(Durable Object · 대국 하나에 하나): 수 검사 · 시계 · 무승부 제안 · 끝나면 레이팅 반영(친선은 반영·기록 없음) · 접속한 모두에게 알림
 import { DurableObject } from 'cloudflare:workers';
 import { Game, type EndReason as EngineEndReason } from '../../engine/game';
 import { parseTimeControl, type Clocks, type Color, type EndReason, type GameClientMessage, type GameResult, type GameServerMessage, type GameSummary, type LiveGame, type TimeControl } from '../../shared/protocol';
 import type { VariantId } from '../../engine/variants';
 import { insertGameStatement } from '../db/games';
-import { loadRating, saveRatingStatement, type RatingRow } from '../db/ratings';
+import { freshRating, loadRating, saveRatingStatement, type RatingRow } from '../db/ratings';
 import type { Env } from '../env';
 import { updateRating } from '../rating/glicko2';
 import { clocksAfterMove, colorToMove, liveClocks, nextDeadline } from './clock';
@@ -18,6 +18,8 @@ export interface GameSetup {
   readonly id: string;
   readonly variant: VariantId;
   readonly timeControl: TimeControl;
+  /** false = 친선(게스트 포함) · 레이팅·기록 없음 */
+  readonly rated: boolean;
   readonly white: SeatedPlayer;
   readonly black: SeatedPlayer;
 }
@@ -30,6 +32,8 @@ interface StoredGame {
   readonly id: string;
   readonly variant: VariantId;
   readonly timeControl: TimeControl;
+  /** 예전에 저장된 대국엔 없음 → 랭크로 봄 */
+  readonly rated?: boolean;
   readonly white: PlayerState;
   readonly black: PlayerState;
   readonly moves: string[];
@@ -48,10 +52,10 @@ export class GameRoom extends DurableObject<Env> {
 
   /** 로비가 짝을 지으면 부름 */
   async start(setup: GameSetup): Promise<void> {
-    const [white, black] = await Promise.all([
-      loadRating(this.env.DB, setup.white.id, setup.variant),
-      loadRating(this.env.DB, setup.black.id, setup.variant),
-    ]);
+    // 친선은 게스트가 있을 수 있어 DB 를 읽지 않음(처음 값은 보여 주지 않음)
+    const [white, black] = setup.rated
+      ? await Promise.all([loadRating(this.env.DB, setup.white.id, setup.variant), loadRating(this.env.DB, setup.black.id, setup.variant)])
+      : [freshRating(setup.variant), freshRating(setup.variant)];
     const { initialMs } = parseTimeControl(setup.timeControl);
     const game: StoredGame = {
       ...setup,
@@ -145,16 +149,19 @@ export class GameRoom extends DurableObject<Env> {
 
   /** 끝: 레이팅 계산 · DB 저장(취소된 판은 저장 안 함) · 모두에게 알림 */
   async #finish(game: StoredGame, result: GameResult, reason: EndReason): Promise<void> {
-    const rated = reason !== 'abandon';
+    const ratedGame = isRated(game);
+    const rated = ratedGame && reason !== 'abandon';
     const [whiteAfter, blackAfter] = rated ? rateGame(game.white.rating, game.black.rating, result) : [game.white.rating, game.black.rating];
     const endedAt = new Date().toISOString();
     const change = (before: RatingRow, after: RatingRow) => Math.round(after.rating) - Math.round(before.rating);
+    const info = (player: PlayerState, after: RatingRow) =>
+      ratedGame ? { username: player.username, rating: Math.round(player.rating.rating), ratingChange: change(player.rating, after) } : { username: player.username };
     const summary: GameSummary = {
       id: game.id,
       variant: game.variant,
       timeControl: game.timeControl,
-      white: { username: game.white.username, rating: Math.round(game.white.rating.rating), ratingChange: change(game.white.rating, whiteAfter) },
-      black: { username: game.black.username, rating: Math.round(game.black.rating.rating), ratingChange: change(game.black.rating, blackAfter) },
+      white: info(game.white, whiteAfter),
+      black: info(game.black, blackAfter),
       result,
       reason,
       endedAt,
@@ -166,7 +173,7 @@ export class GameRoom extends DurableObject<Env> {
         insertGameStatement(db, {
           id: game.id, variant: game.variant, time_control: game.timeControl, white_id: game.white.id, black_id: game.black.id,
           result, reason, moves: game.moves.join(' '),
-          white_rating: summary.white.rating, black_rating: summary.black.rating,
+          white_rating: summary.white.rating ?? 0, black_rating: summary.black.rating ?? 0,
           white_change: summary.white.ratingChange ?? 0, black_change: summary.black.ratingChange ?? 0,
           started_at: game.startedAt, ended_at: endedAt,
         }),
@@ -185,7 +192,7 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   #liveView(game: StoredGame, seat: Seat): LiveGame {
-    const player = (state: PlayerState) => ({ username: state.username, rating: Math.round(state.rating.rating) });
+    const player = (state: PlayerState) => (isRated(game) ? { username: state.username, rating: Math.round(state.rating.rating) } : { username: state.username });
     return {
       id: game.id,
       variant: game.variant,
@@ -196,6 +203,7 @@ export class GameRoom extends DurableObject<Env> {
       clocks: liveClocks(game.clocks, game.moves.length, game.turnStartedAt, Date.now()),
       you: seat,
       drawOfferBy: game.drawOfferBy,
+      rated: isRated(game),
     };
   }
 
@@ -267,3 +275,5 @@ function send(socket: WebSocket, message: GameServerMessage): void {
     // 끊긴 연결 — 다시 접속하면 state 로 따라잡음
   }
 }
+
+const isRated = (game: StoredGame) => game.rated !== false;

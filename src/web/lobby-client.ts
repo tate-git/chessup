@@ -9,10 +9,10 @@ export interface SeekHandlers {
 
 export const socketUrl = (path: string) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`;
 
-/** 줄 서기 시작 · 돌려준 함수를 부르면 취소 */
-export function seek(variant: VariantId, timeControl: TimeControl, handlers: SeekHandlers): () => void {
+/** 줄 서기 시작(rated = false 면 친선) · 돌려준 함수를 부르면 취소 */
+export function seek(variant: VariantId, timeControl: TimeControl, rated: boolean, handlers: SeekHandlers): () => void {
   const socket = new WebSocket(socketUrl('/api/lobby'));
-  socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'seek', variant, timeControl })));
+  socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'seek', variant, timeControl, rated })));
   socket.addEventListener('message', event => {
     const message = JSON.parse(String(event.data)) as LobbyServerMessage;
     if (message.type === 'queued') handlers.onQueued(message.waiting);

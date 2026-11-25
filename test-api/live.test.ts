@@ -75,3 +75,69 @@ describe('실시간 대국', () => {
     expect((await live.next(m => m.type === 'state')).game.you).toBe('spectator');
   });
 });
+
+describe('게스트 친선 대국', () => {
+  async function asGuest(): Promise<TestUser> {
+    const guest = TestUser.fresh('g');
+    const started = await guest.request('POST', '/api/auth/guest');
+    expect(started.json.username).toMatch(/^게스트\d{4}$/);
+    return guest;
+  }
+
+  async function casualPair(a: TestUser, b: TestUser) {
+    const [lobbyA, lobbyB] = await Promise.all([a.connect('/api/lobby'), b.connect('/api/lobby')]);
+    lobbyA.send({ type: 'seek', variant: 'standard', timeControl: '3+2', rated: false });
+    lobbyB.send({ type: 'seek', variant: 'standard', timeControl: '3+2', rated: false });
+    const [matchA, matchB] = await Promise.all([lobbyA.next(m => m.type === 'matched'), lobbyB.next(m => m.type === 'matched')]);
+    lobbyA.close();
+    lobbyB.close();
+    expect(matchA.gameId).toBe(matchB.gameId);
+    const [white, black] = matchA.color === 'white' ? [a, b] : [b, a];
+    return { gameId: matchA.gameId as string, white, black };
+  }
+
+  it('같은 게스트는 같은 이름 · 쿠키 없으면 로비 401', async () => {
+    const guest = await asGuest();
+    const again = await guest.request('POST', '/api/auth/guest');
+    const first = (await guest.request('POST', '/api/auth/guest')).json.username;
+    expect(again.json.username).toBe(first);
+    await expect(TestUser.fresh('n').connect('/api/lobby')).rejects.toBeDefined();
+  });
+
+  it('게스트는 랭크로 줄 설 수 없음', async () => {
+    const guest = await asGuest();
+    const lobby = await guest.connect('/api/lobby');
+    lobby.send({ type: 'seek', variant: 'standard', timeControl: '3+2' });
+    expect((await lobby.next(m => m.type === 'error')).code).toBe('unauthorized');
+    lobby.close();
+  });
+
+  it('게스트끼리 친선: 끝까지 두지만 레이팅 없음 · 기록 저장 안 함', async () => {
+    const { gameId, white, black } = await casualPair(await asGuest(), await asGuest());
+    const [liveWhite, liveBlack] = await Promise.all([white.connect(`/api/games/${gameId}/live`), black.connect(`/api/games/${gameId}/live`)]);
+    const state = await liveWhite.next(m => m.type === 'state');
+    expect(state.game).toMatchObject({ you: 'white', rated: false });
+    expect(state.game.white.rating).toBeUndefined();
+    await liveBlack.next(m => m.type === 'state');
+
+    for (const [ply, uci] of ['f2f3', 'e7e5', 'g2g4', 'd8h4'].entries()) {
+      (ply % 2 === 0 ? liveWhite : liveBlack).send({ type: 'move', uci, ply });
+      await liveWhite.next(m => m.type === 'move' && m.ply === ply);
+    }
+    const end = await liveBlack.next(m => m.type === 'end');
+    expect(end.game).toMatchObject({ result: '0-1', reason: 'checkmate' });
+    expect(end.game.black.ratingChange).toBeUndefined();
+    expect((await white.request('GET', `/api/games/${gameId}`)).status).toBe(404);
+  });
+
+  it('회원도 친선으로 게스트와 만나고 레이팅은 그대로', async () => {
+    const member = TestUser.fresh('m');
+    await member.signup();
+    const { gameId, white } = await casualPair(member, await asGuest());
+    const live = await white.connect(`/api/games/${gameId}/live`);
+    await live.next(m => m.type === 'state');
+    live.send({ type: 'resign' });
+    expect((await live.next(m => m.type === 'end')).game.white.ratingChange).toBeUndefined();
+    expect((await member.request('GET', '/api/me')).json.ratings.standard).toMatchObject({ games: 0, rating: 1500 });
+  });
+});

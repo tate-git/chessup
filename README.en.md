@@ -16,6 +16,7 @@ A web game for climbing the ratings in standard chess and mini chess (Los Alamos
 
 - Standard chess rules. Mini chess is Los Alamos chess on a 6×6 board (no bishops; no pawn double step, castling or en passant; no promotion to bishop).
 - Only live games against people count for rating (Glicko-2), rated separately for standard and mini. The server keeps the clock.
+- Guests can play casual games (unrated, not recorded) without signing up; members can join casual games too.
 - Hints are for bot games only: once per game until you've played 20 games against people, then once a day.
 
 ## Code map

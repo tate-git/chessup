@@ -63,27 +63,40 @@ export const homeScreen: Screen = async root => {
     );
   };
 
+  /** 친선 대국 시간 버튼(레이팅 없음 · 게스트도) */
+  const casualButtons = (variant: VariantId) =>
+    `<div class="time-controls">${TIME_CONTROLS[variant].map(tc => `<button type="button" data-casual="${tc}">🤝 ${tc}</button>`).join('')}</div>`;
+
   const rankedCard = (variant: VariantId) => {
     const me = session.me;
     if (!me) {
       return `<article class="card"><h2>⚔️ ${t('랭크 대국', 'Ranked games')}</h2>
         <p class="muted">${t('사람과 실시간 대국 · 이기면 레이팅이 올라요', 'Play people live · win to climb the ladder')}</p>
-        <a class="button primary" href="#/login">${t('로그인하고 시작', 'Log in to play')}</a></article>`;
+        <a class="button primary" href="#/login">${t('로그인하고 시작', 'Log in to play')}</a></article>
+        <article class="card"><h2>🤝 ${t('친선 대국', 'Casual games')} <span class="muted small">${t('가입 없이', 'no sign-up')}</span></h2>
+        <p class="muted">${t('게스트로 바로 사람과 둬요 · 레이팅은 오르지 않아요', 'Play people right away as a guest · rating unchanged')}</p>
+        ${casualButtons(variant)}</article>`;
     }
     const rating = me.ratings[variant];
     return `<article class="card ranked">
       <h2>⚔️ ${t('랭크 대국', 'Ranked games')} <span class="rating">${ratingText(rating.rating, rating.provisional)}</span></h2>
       <p class="muted">${t(`${rating.games}판 · ${rating.wins}승 ${rating.losses}패 ${rating.draws}무`, `${rating.games} games · ${rating.wins}W ${rating.losses}L ${rating.draws}D`)}</p>
       <div class="time-controls">${TIME_CONTROLS[variant].map(tc => `<button type="button" class="primary" data-seek="${tc}">⏱ ${tc}</button>`).join('')}</div>
+      <p class="muted small">${t('🤝 친선 대국 · 레이팅 없음 · 게스트와도 만나요', '🤝 Casual · unrated · you may meet guests')}</p>
+      ${casualButtons(variant)}
     </article>`;
   };
 
-  const startSeeking = (timeControl: TimeControl) => {
+  /** rated = false 면 친선 · 로그인 안 했으면 게스트로 시작(쿠키)하고 줄 섬 */
+  const startSeeking = async (timeControl: TimeControl, rated: boolean) => {
+    const guestName = session.me ? null : (await api.guest()).username;
+    const kind = rated ? '' : ` · 🤝 ${t('친선', 'Casual')}`;
+    const label = `${variantLabel(settings.variant)} · ${timeControl}${kind}${guestName ? ` · ${guestName}` : ''}`;
     const dialog = query<HTMLDialogElement>(root, '#seeking');
-    dialog.innerHTML = `<p class="result-icon">🔎</p><h2>${t('상대를 찾는 중…', 'Finding an opponent…')}</h2><p class="muted" id="seek-info">${variantLabel(settings.variant)} · ${timeControl}</p><div class="row"><button type="button" data-action="cancel-seek">${t('취소', 'Cancel')}</button></div>`;
+    dialog.innerHTML = `<p class="result-icon">🔎</p><h2>${t('상대를 찾는 중…', 'Finding an opponent…')}</h2><p class="muted" id="seek-info">${label}</p><div class="row"><button type="button" data-action="cancel-seek">${t('취소', 'Cancel')}</button></div>`;
     dialog.showModal();
-    cancelSeek = seek(settings.variant, timeControl, {
-      onQueued: waiting => (query(dialog, '#seek-info').textContent = `${variantLabel(settings.variant)} · ${timeControl} · ${t(`대기 ${waiting}명`, `${waiting} waiting`)}`),
+    cancelSeek = seek(settings.variant, timeControl, rated, {
+      onQueued: waiting => (query(dialog, '#seek-info').textContent = `${label} · ${t(`대기 ${waiting}명`, `${waiting} waiting`)}`),
       onMatched: gameId => {
         cancelSeek = null;
         dialog.close();
@@ -102,10 +115,11 @@ export const homeScreen: Screen = async root => {
   root.onclick = async event => {
     const button = (event.target as HTMLElement).closest<HTMLElement>('button');
     if (!button || button.closest('.level-wheel')) return;   // 휠은 스스로 처리(다시 그리면 위치가 처음으로 감)
-    const { action, variant, color, seek: timeControl } = button.dataset;
+    const { action, variant, color, seek: timeControl, casual } = button.dataset;
     if (variant) settings.variant = variant as VariantId;
     if (color) settings.color = color as ColorChoice;
-    if (timeControl) return startSeeking(timeControl as TimeControl);
+    if (timeControl) return startSeeking(timeControl as TimeControl, true);
+    if (casual) return startSeeking(casual as TimeControl, false);
     if (action === 'cancel-seek') return stopSeeking();
     if (action === 'lang') switchLang();
     if (action === 'logout') {

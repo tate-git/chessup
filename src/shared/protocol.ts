@@ -44,7 +44,8 @@ export interface Me {
 
 export interface PlayerInfo {
   readonly username: string;
-  readonly rating: number;
+  /** 친선 대국은 없음 */
+  readonly rating?: number;
   readonly ratingChange?: number;
 }
 
@@ -110,6 +111,8 @@ export interface LiveGame {
   readonly clocks: Clocks;
   readonly you: Color | 'spectator';
   readonly drawOfferBy?: Color;
+  /** false = 친선(레이팅·기록 없음 · 게스트도 참여) */
+  readonly rated: boolean;
 }
 
 export interface ErrorMessage {
@@ -119,7 +122,7 @@ export interface ErrorMessage {
 }
 
 export type LobbyClientMessage =
-  | { readonly type: 'seek'; readonly variant: VariantId; readonly timeControl: TimeControl }
+  | { readonly type: 'seek'; readonly variant: VariantId; readonly timeControl: TimeControl; readonly rated?: boolean }
   | { readonly type: 'cancel' };
 
 export type LobbyServerMessage =

@@ -12,7 +12,7 @@ export const liveScreen = (gameId: string): Screen => root => {
     <section class="play">
       <header class="play-bar">
         <a href="#/" class="back">← ${t('홈', 'Home')}</a>
-        <span id="title">⚔️ ${t('랭크 대국', 'Ranked game')}</span>
+        <span id="title"></span>
       </header>
       <div class="table">
         <div class="board-column">
@@ -38,6 +38,7 @@ export const liveScreen = (gameId: string): Screen => root => {
 
   const live = new LiveSession(gameId, {
     board: query(root, '#board'),
+    title: query(root, '#title'),
     topPlayer: query(root, '#top-player'),
     bottomPlayer: query(root, '#bottom-player'),
     topClock: query(root, '#top-clock'),
@@ -58,11 +59,14 @@ export const liveScreen = (gameId: string): Screen => root => {
 };
 
 function showResult(root: HTMLElement, summary: GameSummary, you: Color | 'spectator'): void {
-  query(root, '#title').textContent = `⚔️ ${variantLabel(summary.variant)} · ${summary.timeControl}`;
+  const rated = summary.white.rating !== undefined;
+  query(root, '#title').textContent = `${rated ? '⚔️' : '🤝'} ${variantLabel(summary.variant)} · ${summary.timeControl}`;
   const winner: Color | null = summary.result === '1-0' ? 'white' : summary.result === '0-1' ? 'black' : null;
   const headline = you === 'spectator' ? summary.result : winner === null ? t('무승부', 'Draw') : winner === you ? t('승리!', 'You win!') : t('패배', 'You lost');
-  const change = you === 'spectator' ? undefined : summary[you].ratingChange;
-  const changeText = change === undefined || summary.reason === 'abandon' ? '' : `<p class="rating-change ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '▲' : '▼'} ${Math.abs(change)} → ${(summary[you as Color].rating) + change}</p>`;
+  const mine = you === 'spectator' ? undefined : summary[you];
+  const changeText = !mine || mine.ratingChange === undefined || mine.rating === undefined || summary.reason === 'abandon'
+    ? (rated ? '' : `<p class="muted">${t('친선 대국이라 레이팅은 그대로예요', 'Casual game — rating unchanged')}</p>`)
+    : `<p class="rating-change ${mine.ratingChange >= 0 ? 'up' : 'down'}">${mine.ratingChange >= 0 ? '▲' : '▼'} ${Math.abs(mine.ratingChange)} → ${mine.rating + mine.ratingChange}</p>`;
   const dialog = query<HTMLDialogElement>(root, '#result');
   dialog.innerHTML = `
     <p class="result-icon">${winner === null ? '🤝' : winner === you ? '🏆' : you === 'spectator' ? '♟️' : '😵'}</p>

@@ -58,6 +58,7 @@ button, a.button {
 }
 
 .muted { color: var(--muted); }
+.small { font-size: 13px; }
 
 /* ───────── 홈 */
 .home {
