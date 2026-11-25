@@ -200,12 +200,24 @@ a.button.wide { display: block; }
     & > .side { grid-column: 3; width: var(--side); }
     & > .board-wrap { width: min(var(--room), calc(100dvh - 90px)); }
     & > .board-column { width: min(var(--room), calc(100dvh - 170px)); }
+    & > .board-stack { width: min(var(--room), calc(100dvh - 120px)); }
   }
 }
 
 .board-wrap {
   width: min(100%, calc(100dvh - 90px));
   margin: 0 auto;
+}
+
+/* 연습: 판 바로 아래 상태 글자(내 차례 · 생각 중 · 대국 끝) */
+.board-stack {
+  display: grid;
+  gap: 8px;
+  width: min(100%, calc(100dvh - 120px));
+  margin: 0 auto;
+
+  & .board-wrap { width: 100%; }
+  & .status { text-align: center; }
 }
 
 .side {

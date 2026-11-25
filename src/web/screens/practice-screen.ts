@@ -25,10 +25,12 @@ export const practiceScreen = (level: number): Screen => async root => {
         <span>${variantLabel(variant)} · 🤖 ${t(`봇 ${level}단`, `Bot level ${level}`)}</span>
       </header>
       <div class="table">
-        <div class="board-wrap"><div id="board"></div></div>
+        <div class="board-stack">
+          <div class="board-wrap"><div id="board"></div></div>
+          <p id="status" class="status"></p>
+        </div>
         <aside class="side">
           <div class="toolbar">
-            <p id="status" class="status"></p>
             <div class="controls">
               <button type="button" id="hint"></button>
               <button type="button" id="undo"></button>
