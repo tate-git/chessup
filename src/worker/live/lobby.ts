@@ -1,8 +1,10 @@
-// 매칭 로비(Durable Object · 하나): 같은 종목·시간·(랭크/친선)끼리 · 랭크는 레이팅 차이가 허용 범위면 짝(오래 기다릴수록 넓어짐) · 친선은 레이팅 안 봄 · 게스트는 친선만
+// 매칭 로비(Durable Object · 하나): 회원·게스트 한 줄 — 같은 종목·시간끼리, 레이팅 차이가 허용 범위면 짝(오래 기다릴수록 넓어짐, 게스트는 1500)
+// 방: 방 번호(숫자 네 자리)를 만들어 기다리면, 번호를 넣은 사람과 바로 짝
 import { DurableObject } from 'cloudflare:workers';
 import { isVariantId } from '../../engine/variants';
 import { TIME_CONTROLS, type LobbyClientMessage, type LobbyServerMessage, type TimeControl } from '../../shared/protocol';
 import type { VariantId } from '../../engine/variants';
+import { INITIAL_RATING } from '../rating/glicko2';
 import { loadRating } from '../db/ratings';
 import type { Env } from '../env';
 
@@ -11,7 +13,8 @@ interface Seeker {
   readonly userId: string;
   readonly username: string;
   readonly member: boolean;
-  seek?: { readonly variant: VariantId; readonly timeControl: TimeControl; readonly rated: boolean; readonly rating: number; readonly since: number };
+  seek?: { readonly variant: VariantId; readonly timeControl: TimeControl; readonly rating: number; readonly since: number };
+  room?: { readonly code: string; readonly variant: VariantId; readonly timeControl: TimeControl };
 }
 
 const BASE_WINDOW = 150;
@@ -19,6 +22,7 @@ const WINDOW_GROWTH_PER_STEP = 50;
 const WINDOW_STEP_MS = 5_000;
 const MAX_WINDOW = 800;
 const RETRY_MS = 3_000;
+const ROOM_CODE = /^\d{4}$/;
 
 export class Lobby extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
@@ -36,19 +40,23 @@ export class Lobby extends DurableObject<Env> {
     const seeker = socket.deserializeAttachment() as Seeker;
     if (!message) return send(socket, { type: 'error', code: 'invalid_input', message: '알 수 없는 글' });
 
-    if (message.type === 'cancel') {
-      socket.serializeAttachment({ ...seeker, seek: undefined });
-      return;
+    switch (message.type) {
+      case 'cancel':
+        return socket.serializeAttachment(idle(seeker));
+      case 'joinRoom':
+        return this.#joinRoom(socket, seeker, message.code);
+      case 'createRoom':
+      case 'seek': {
+        if (!isVariantId(message.variant) || !TIME_CONTROLS[message.variant].includes(message.timeControl)) {
+          return send(socket, { type: 'error', code: 'invalid_input', message: '종목·시간을 확인해 주세요' });
+        }
+        this.#dropOtherWaits(seeker.userId, socket);   // 같은 사람이 탭 여러 개로 줄 서지 않게
+        if (message.type === 'createRoom') return this.#createRoom(socket, seeker, message.variant, message.timeControl);
+        const rating = seeker.member ? (await loadRating(this.env.DB, seeker.userId, message.variant)).rating : INITIAL_RATING.rating;
+        socket.serializeAttachment({ ...idle(seeker), seek: { variant: message.variant, timeControl: message.timeControl, rating, since: Date.now() } });
+        return this.#matchWaiting();
+      }
     }
-    if (!isVariantId(message.variant) || !TIME_CONTROLS[message.variant].includes(message.timeControl)) {
-      return send(socket, { type: 'error', code: 'invalid_input', message: '종목·시간을 확인해 주세요' });
-    }
-    const rated = message.rated !== false;
-    if (rated && !seeker.member) return send(socket, { type: 'error', code: 'unauthorized', message: '랭크 대국은 로그인해야 둘 수 있어요. 게스트는 친선 대국만 돼요' });
-    this.#dropOtherSeeks(seeker.userId, socket);   // 같은 사람이 탭 여러 개로 줄 서지 않게
-    const rating = rated ? (await loadRating(this.env.DB, seeker.userId, message.variant)).rating : 0;
-    socket.serializeAttachment({ ...seeker, seek: { variant: message.variant, timeControl: message.timeControl, rated, rating, since: Date.now() } });
-    await this.#matchWaiting();
   }
 
   override async webSocketClose(socket: WebSocket): Promise<void> {
@@ -59,49 +67,62 @@ export class Lobby extends DurableObject<Env> {
     await this.#matchWaiting();
   }
 
+  #createRoom(socket: WebSocket, seeker: Seeker, variant: VariantId, timeControl: TimeControl): void {
+    const taken = new Set(this.#entries().flatMap(({ seeker: other }) => (other.room ? [other.room.code] : [])));
+    let code: string;
+    do code = String(Math.floor(Math.random() * 10_000)).padStart(4, '0');
+    while (taken.has(code));
+    socket.serializeAttachment({ ...idle(seeker), room: { code, variant, timeControl } });
+    send(socket, { type: 'roomCreated', code });
+  }
+
+  async #joinRoom(socket: WebSocket, seeker: Seeker, code: string): Promise<void> {
+    if (!ROOM_CODE.test(code)) return send(socket, { type: 'error', code: 'invalid_input', message: '방 번호는 숫자 네 자리예요' });
+    const host = this.#entries().find(entry => entry.seeker.room?.code === code);
+    if (!host) return send(socket, { type: 'error', code: 'not_found', message: '없는 방이에요. 번호를 확인해 주세요' });
+    if (host.seeker.userId === seeker.userId) return send(socket, { type: 'error', code: 'invalid_input', message: '내가 만든 방이에요. 친구에게 번호를 알려 주세요' });
+    const { variant, timeControl } = host.seeker.room!;
+    await this.#startGame(host, { socket, seeker: idle(seeker) }, variant, timeControl);
+  }
+
   /** 기다리는 사람들 중 짝이 되는 둘을 계속 묶음 · 남은 사람이 있으면 잠시 뒤 다시 */
   async #matchWaiting(): Promise<void> {
     const now = Date.now();
-    let waiting = this.#waiting();
+    let waiting = this.#seeking();
     for (const [first, second] of findPairs(waiting.map(entry => entry.seeker), now)) {
-      await this.#startGame(waiting[first], waiting[second]);
+      const { variant, timeControl } = waiting[first].seeker.seek!;
+      await this.#startGame(waiting[first], waiting[second], variant, timeControl);
     }
-    waiting = this.#waiting();
+    waiting = this.#seeking();
     for (const { socket, seeker } of waiting) {
       send(socket, { type: 'queued', waiting: waiting.filter(other => sameQueue(other.seeker, seeker)).length });
     }
     if (waiting.length > 0) await this.ctx.storage.setAlarm(now + RETRY_MS);
   }
 
-  async #startGame(a: WaitingEntry, b: WaitingEntry): Promise<void> {
+  async #startGame(a: WaitingEntry, b: WaitingEntry, variant: VariantId, timeControl: TimeControl): Promise<void> {
     const [white, black] = Math.random() < 0.5 ? [a, b] : [b, a];
-    const { variant, timeControl, rated } = a.seeker.seek!;
     const gameId = crypto.randomUUID();
     const room = this.env.GAME_ROOM.get(this.env.GAME_ROOM.idFromName(gameId));
-    await room.start({
-      id: gameId,
-      variant,
-      timeControl,
-      rated,
-      white: { id: white.seeker.userId, username: white.seeker.username },
-      black: { id: black.seeker.userId, username: black.seeker.username },
-    });
+    const seat = ({ seeker }: WaitingEntry) => ({ id: seeker.userId, username: seeker.username, member: seeker.member });
+    await room.start({ id: gameId, variant, timeControl, white: seat(white), black: seat(black) });
     for (const [entry, color] of [[white, 'white'], [black, 'black']] as const) {
-      entry.socket.serializeAttachment({ ...entry.seeker, seek: undefined });
+      entry.socket.serializeAttachment(idle(entry.seeker));
       send(entry.socket, { type: 'matched', gameId, color });
     }
   }
 
-  #waiting(): WaitingEntry[] {
-    return this.ctx
-      .getWebSockets()
-      .map(socket => ({ socket, seeker: socket.deserializeAttachment() as Seeker }))
-      .filter(entry => entry.seeker.seek);
+  #entries(): WaitingEntry[] {
+    return this.ctx.getWebSockets().map(socket => ({ socket, seeker: socket.deserializeAttachment() as Seeker }));
   }
 
-  #dropOtherSeeks(userId: string, keep: WebSocket): void {
-    for (const { socket, seeker } of this.#waiting()) {
-      if (seeker.userId === userId && socket !== keep) socket.serializeAttachment({ ...seeker, seek: undefined });
+  #seeking(): WaitingEntry[] {
+    return this.#entries().filter(entry => entry.seeker.seek);
+  }
+
+  #dropOtherWaits(userId: string, keep: WebSocket): void {
+    for (const { socket, seeker } of this.#entries()) {
+      if (seeker.userId === userId && socket !== keep && (seeker.seek || seeker.room)) socket.serializeAttachment(idle(seeker));
     }
   }
 }
@@ -111,7 +132,10 @@ interface WaitingEntry {
   readonly seeker: Seeker;
 }
 
-const sameQueue = (a: Seeker, b: Seeker) => a.seek?.variant === b.seek?.variant && a.seek?.timeControl === b.seek?.timeControl && a.seek?.rated === b.seek?.rated;
+/** 줄·방에서 빠진 상태 */
+const idle = (seeker: Seeker): Seeker => ({ userId: seeker.userId, username: seeker.username, member: seeker.member });
+
+const sameQueue = (a: Seeker, b: Seeker) => a.seek?.variant === b.seek?.variant && a.seek?.timeControl === b.seek?.timeControl;
 
 /** 기다린 시간에 따라 넓어지는 레이팅 허용 범위 */
 export function ratingWindow(waitedMs: number): number {
@@ -129,7 +153,7 @@ export function findPairs(seekers: readonly Seeker[], now: number): [number, num
     const window = ratingWindow(now - me.seek!.since);
     const partner = order
       .filter(other => other !== index && !taken.has(other) && sameQueue(seekers[other], me) && seekers[other].userId !== me.userId)
-      .filter(other => !me.seek!.rated || Math.abs(seekers[other].seek!.rating - me.seek!.rating) <= Math.max(window, ratingWindow(now - seekers[other].seek!.since)))
+      .filter(other => Math.abs(seekers[other].seek!.rating - me.seek!.rating) <= Math.max(window, ratingWindow(now - seekers[other].seek!.since)))
       .sort((a, b) => Math.abs(seekers[a].seek!.rating - me.seek!.rating) - Math.abs(seekers[b].seek!.rating - me.seek!.rating))[0];
     if (partner === undefined) continue;
     taken.add(index).add(partner);
@@ -138,11 +162,13 @@ export function findPairs(seekers: readonly Seeker[], now: number): [number, num
   return pairs;
 }
 
+const MESSAGE_TYPES = new Set(['seek', 'createRoom', 'joinRoom', 'cancel']);
+
 function parseMessage(raw: string | ArrayBuffer): LobbyClientMessage | null {
   if (typeof raw !== 'string') return null;
   try {
     const message = JSON.parse(raw) as LobbyClientMessage;
-    return message?.type === 'seek' || message?.type === 'cancel' ? message : null;
+    return MESSAGE_TYPES.has(message?.type) ? message : null;
   } catch {
     return null;
   }

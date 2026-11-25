@@ -5,6 +5,7 @@ import { homeScreen } from './screens/home';
 import { leaderboardScreen } from './screens/leaderboard';
 import { liveScreen } from './screens/live-screen';
 import { practiceScreen } from './screens/practice-screen';
+import { roomScreen } from './screens/room-screen';
 import type { Cleanup, Screen } from './screens/screen';
 import { session } from './session';
 
@@ -18,6 +19,7 @@ function route(hash: string): Screen {
     case 'leaderboard': return leaderboardScreen;
     case 'practice': return practiceScreen(Math.min(10, Math.max(1, Number(param) || 1)));
     case 'live': return param ? liveScreen(param) : homeScreen;
+    case 'room': return param ? roomScreen(param) : homeScreen;
     default: return homeScreen;
   }
 }

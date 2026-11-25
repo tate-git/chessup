@@ -168,6 +168,7 @@ button, a.button {
 }
 
 a.button.wide { display: block; }
+button.wide { display: block; width: 100%; }
 
 .credits { text-align: center; font-size: 12px; color: var(--muted); }
 
@@ -399,6 +400,26 @@ dialog {
 
 .ranked .rating { float: right; color: var(--accent); }
 .time-controls { display: flex; gap: 8px; flex-wrap: wrap; & button { flex: 1; } }
+
+/* 대국 카드 아래: 방 만들기 · 방 번호로 들어가기 */
+.room-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+
+  & > button { flex: 0 0 auto; }
+}
+.join-room {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+
+  & input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); letter-spacing: 0.15em; }
+}
+.room-code { margin: 4px 0; font-size: 44px; font-weight: 800; letter-spacing: 0.2em; text-align: center; }
+.room-join { text-align: center; }
+.room-link { word-break: break-all; text-align: center; user-select: all; }
 
 /* ───────── 로그인 */
 .auth {

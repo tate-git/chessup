@@ -76,7 +76,7 @@ describe('실시간 대국', () => {
   });
 });
 
-describe('게스트 친선 대국', () => {
+describe('게스트 · 한 줄 매칭', () => {
   async function asGuest(): Promise<TestUser> {
     const guest = TestUser.fresh('g');
     const started = await guest.request('POST', '/api/auth/guest');
@@ -84,10 +84,11 @@ describe('게스트 친선 대국', () => {
     return guest;
   }
 
-  async function casualPair(a: TestUser, b: TestUser) {
+  /** 둘이 같은 조건으로 줄 섬(회원·게스트 상관없이 같은 줄) */
+  async function pair(a: TestUser, b: TestUser) {
     const [lobbyA, lobbyB] = await Promise.all([a.connect('/api/lobby'), b.connect('/api/lobby')]);
-    lobbyA.send({ type: 'seek', variant: 'standard', timeControl: '3+2', rated: false });
-    lobbyB.send({ type: 'seek', variant: 'standard', timeControl: '3+2', rated: false });
+    lobbyA.send({ type: 'seek', variant: 'standard', timeControl: '5+3' });
+    lobbyB.send({ type: 'seek', variant: 'standard', timeControl: '5+3' });
     const [matchA, matchB] = await Promise.all([lobbyA.next(m => m.type === 'matched'), lobbyB.next(m => m.type === 'matched')]);
     lobbyA.close();
     lobbyB.close();
@@ -96,48 +97,83 @@ describe('게스트 친선 대국', () => {
     return { gameId: matchA.gameId as string, white, black };
   }
 
-  it('같은 게스트는 같은 이름 · 쿠키 없으면 로비 401', async () => {
-    const guest = await asGuest();
-    const again = await guest.request('POST', '/api/auth/guest');
-    const first = (await guest.request('POST', '/api/auth/guest')).json.username;
-    expect(again.json.username).toBe(first);
-    await expect(TestUser.fresh('n').connect('/api/lobby')).rejects.toBeDefined();
-  });
-
-  it('게스트는 랭크로 줄 설 수 없음', async () => {
-    const guest = await asGuest();
-    const lobby = await guest.connect('/api/lobby');
-    lobby.send({ type: 'seek', variant: 'standard', timeControl: '3+2' });
-    expect((await lobby.next(m => m.type === 'error')).code).toBe('unauthorized');
-    lobby.close();
-  });
-
-  it('게스트끼리 친선: 끝까지 두지만 레이팅 없음 · 기록 저장 안 함', async () => {
-    const { gameId, white, black } = await casualPair(await asGuest(), await asGuest());
+  async function foolsMate(gameId: string, white: TestUser, black: TestUser) {
     const [liveWhite, liveBlack] = await Promise.all([white.connect(`/api/games/${gameId}/live`), black.connect(`/api/games/${gameId}/live`)]);
     const state = await liveWhite.next(m => m.type === 'state');
-    expect(state.game).toMatchObject({ you: 'white', rated: false });
-    expect(state.game.white.rating).toBeUndefined();
     await liveBlack.next(m => m.type === 'state');
-
     for (const [ply, uci] of ['f2f3', 'e7e5', 'g2g4', 'd8h4'].entries()) {
       (ply % 2 === 0 ? liveWhite : liveBlack).send({ type: 'move', uci, ply });
       await liveWhite.next(m => m.type === 'move' && m.ply === ply);
     }
-    const end = await liveBlack.next(m => m.type === 'end');
-    expect(end.game).toMatchObject({ result: '0-1', reason: 'checkmate' });
-    expect(end.game.black.ratingChange).toBeUndefined();
+    return { state: state.game, end: (await liveBlack.next(m => m.type === 'end')).game };
+  }
+
+  it('같은 게스트는 같은 이름 · 쿠키 없으면 로비 401', async () => {
+    const guest = await asGuest();
+    const first = (await guest.request('POST', '/api/auth/guest')).json.username;
+    expect((await guest.request('POST', '/api/auth/guest')).json.username).toBe(first);
+    await expect(TestUser.fresh('n').connect('/api/lobby')).rejects.toBeDefined();
+  });
+
+  it('게스트끼리: 끝까지 두고 레이팅·기록 없음', async () => {
+    const { gameId, white, black } = await pair(await asGuest(), await asGuest());
+    const { state, end } = await foolsMate(gameId, white, black);
+    expect(state.white.rating).toBeUndefined();
+    expect(end).toMatchObject({ result: '0-1', reason: 'checkmate' });
+    expect(end.black.ratingChange).toBeUndefined();
     expect((await white.request('GET', `/api/games/${gameId}`)).status).toBe(404);
   });
 
-  it('회원도 친선으로 게스트와 만나고 레이팅은 그대로', async () => {
+  it('회원과 게스트: 같은 줄에서 만나 회원 레이팅만 바뀜 · 기록은 안 남음', async () => {
     const member = TestUser.fresh('m');
     await member.signup();
-    const { gameId, white } = await casualPair(member, await asGuest());
-    const live = await white.connect(`/api/games/${gameId}/live`);
-    await live.next(m => m.type === 'state');
-    live.send({ type: 'resign' });
-    expect((await live.next(m => m.type === 'end')).game.white.ratingChange).toBeUndefined();
-    expect((await member.request('GET', '/api/me')).json.ratings.standard).toMatchObject({ games: 0, rating: 1500 });
+    const { gameId, white, black } = await pair(member, await asGuest());
+    const { end } = await foolsMate(gameId, white, black);
+    const memberColor = white === member ? 'white' : 'black';
+    const guestColor = memberColor === 'white' ? 'black' : 'white';
+    expect(end[memberColor].ratingChange).not.toBe(0);
+    expect(end[guestColor].rating).toBeUndefined();
+    expect((await member.request('GET', '/api/me')).json.ratings.standard.games).toBe(1);
+    expect((await member.request('GET', `/api/games/${gameId}`)).status).toBe(404);
+  });
+});
+
+describe('방 번호', () => {
+  it('만든 방 번호로 들어오면 바로 같은 대국 · 레이팅 반영', async () => {
+    const [host, friend] = [TestUser.fresh('h'), TestUser.fresh('f')];
+    await Promise.all([host.signup(), friend.signup()]);
+    const hostLobby = await host.connect('/api/lobby');
+    hostLobby.send({ type: 'createRoom', variant: 'mini', timeControl: '3+2' });
+    const { code } = await hostLobby.next(m => m.type === 'roomCreated');
+    expect(code).toMatch(/^\d{4}$/);
+
+    const friendLobby = await friend.connect('/api/lobby');
+    friendLobby.send({ type: 'joinRoom', code });
+    const [a, b] = await Promise.all([hostLobby.next(m => m.type === 'matched'), friendLobby.next(m => m.type === 'matched')]);
+    expect(a.gameId).toBe(b.gameId);
+    const live = await host.connect(`/api/games/${a.gameId}/live`);
+    const state = (await live.next(m => m.type === 'state')).game;
+    expect(state).toMatchObject({ variant: 'mini', timeControl: '3+2' });
+    expect(state.white.rating).toBe(1500);
+  });
+
+  it('없는 방 · 내 방에는 못 들어감 · 게스트도 들어감', async () => {
+    const host = TestUser.fresh('h');
+    await host.signup();
+    const hostLobby = await host.connect('/api/lobby');
+    hostLobby.send({ type: 'createRoom', variant: 'standard', timeControl: '10+0' });
+    const { code } = await hostLobby.next(m => m.type === 'roomCreated');
+
+    const self = await host.connect('/api/lobby');
+    self.send({ type: 'joinRoom', code });
+    expect((await self.next(m => m.type === 'error')).code).toBe('invalid_input');
+
+    const guest = TestUser.fresh('g');
+    await guest.request('POST', '/api/auth/guest');
+    const guestLobby = await guest.connect('/api/lobby');
+    guestLobby.send({ type: 'joinRoom', code: code === '0000' ? '0001' : '0000' });
+    expect((await guestLobby.next(m => m.type === 'error')).code).toBe('not_found');
+    guestLobby.send({ type: 'joinRoom', code });
+    expect((await guestLobby.next(m => m.type === 'matched')).gameId).toBe((await hostLobby.next(m => m.type === 'matched')).gameId);
   });
 });

@@ -59,13 +59,12 @@ export const liveScreen = (gameId: string): Screen => root => {
 };
 
 function showResult(root: HTMLElement, summary: GameSummary, you: Color | 'spectator'): void {
-  const rated = summary.white.rating !== undefined;
-  query(root, '#title').textContent = `${rated ? '⚔️' : '🤝'} ${variantLabel(summary.variant)} · ${summary.timeControl}`;
+  query(root, '#title').textContent = `⚔️ ${variantLabel(summary.variant)} · ${summary.timeControl}`;
   const winner: Color | null = summary.result === '1-0' ? 'white' : summary.result === '0-1' ? 'black' : null;
   const headline = you === 'spectator' ? summary.result : winner === null ? t('무승부', 'Draw') : winner === you ? t('승리!', 'You win!') : t('패배', 'You lost');
   const mine = you === 'spectator' ? undefined : summary[you];
   const changeText = !mine || mine.ratingChange === undefined || mine.rating === undefined || summary.reason === 'abandon'
-    ? (rated ? '' : `<p class="muted">${t('친선 대국이라 레이팅은 그대로예요', 'Casual game — rating unchanged')}</p>`)
+    ? (mine && mine.rating === undefined ? `<p class="muted">${t('게스트는 레이팅이 쌓이지 않아요 · 가입하면 쌓여요', 'Guests have no rating — sign up to keep one')}</p>` : '')
     : `<p class="rating-change ${mine.ratingChange >= 0 ? 'up' : 'down'}">${mine.ratingChange >= 0 ? '▲' : '▼'} ${Math.abs(mine.ratingChange)} → ${mine.rating + mine.ratingChange}</p>`;
   const dialog = query<HTMLDialogElement>(root, '#result');
   dialog.innerHTML = `

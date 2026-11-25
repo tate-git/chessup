@@ -92,7 +92,7 @@ export class LiveSession {
     for (const uci of state.moves) this.#game.playUci(uci);
     this.#setClocks(state.clocks);
     this.#board.orientation = state.you === 'black' ? BLACK : WHITE;
-    this.view.title.textContent = state.rated ? `⚔️ ${t('랭크 대국', 'Ranked game')}` : `🤝 ${t('친선 대국', 'Casual game')}`;
+    this.view.title.textContent = `⚔️ ${t('대국', 'Game')}`;
     this.view.drawButtons.hidden = !(state.drawOfferBy && state.you !== 'spectator' && state.drawOfferBy !== state.you);
     this.#render();
   }

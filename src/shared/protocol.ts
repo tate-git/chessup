@@ -44,7 +44,7 @@ export interface Me {
 
 export interface PlayerInfo {
   readonly username: string;
-  /** 친선 대국은 없음 */
+  /** 게스트는 없음(레이팅은 회원만 쌓임) */
   readonly rating?: number;
   readonly ratingChange?: number;
 }
@@ -111,8 +111,6 @@ export interface LiveGame {
   readonly clocks: Clocks;
   readonly you: Color | 'spectator';
   readonly drawOfferBy?: Color;
-  /** false = 친선(레이팅·기록 없음 · 게스트도 참여) */
-  readonly rated: boolean;
 }
 
 export interface ErrorMessage {
@@ -122,11 +120,15 @@ export interface ErrorMessage {
 }
 
 export type LobbyClientMessage =
-  | { readonly type: 'seek'; readonly variant: VariantId; readonly timeControl: TimeControl; readonly rated?: boolean }
+  | { readonly type: 'seek'; readonly variant: VariantId; readonly timeControl: TimeControl }
+  /** 방 만들기: 방 번호를 받아 친구가 들어올 때까지 기다림 */
+  | { readonly type: 'createRoom'; readonly variant: VariantId; readonly timeControl: TimeControl }
+  | { readonly type: 'joinRoom'; readonly code: string }
   | { readonly type: 'cancel' };
 
 export type LobbyServerMessage =
   | { readonly type: 'queued'; readonly waiting: number }
+  | { readonly type: 'roomCreated'; readonly code: string }
   | { readonly type: 'matched'; readonly gameId: string; readonly color: Color }
   | ErrorMessage;
 
