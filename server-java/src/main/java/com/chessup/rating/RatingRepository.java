@@ -36,16 +36,15 @@ public class RatingRepository {
      */
     public Map<UUID, PlayerRating> lockForUpdate(Collection<UUID> userIds, Variant variant) {
         var now = OffsetDateTime.now();
-        var insert = dsl.insertInto(RATINGS, RATINGS.USER_ID, RATINGS.VARIANT, RATINGS.UPDATED_AT);
-        for (UUID userId : userIds) {
-            insert = insert.values(userId, variant.code(), now);
-        }
-        insert.onConflictDoNothing().execute();
+        dsl.insertInto(RATINGS, RATINGS.USER_ID, RATINGS.VARIANT, RATINGS.UPDATED_AT)
+                .valuesOfRows(userIds.stream().map(userId -> row(userId, variant, now)).toList())
+                .onConflictDoNothing()
+                .execute();
 
         return dsl.select(RATINGS.USER_ID, PLAYER_RATING)
                 .from(RATINGS)
                 .where(RATINGS.USER_ID.in(userIds))
-                .and(RATINGS.VARIANT.eq(variant.code()))
+                .and(RATINGS.VARIANT.eq(variant))
                 .orderBy(RATINGS.USER_ID)
                 .forUpdate()
                 .fetch()
@@ -64,7 +63,7 @@ public class RatingRepository {
                 .set(RATINGS.DRAWS, rating.draws())
                 .set(RATINGS.UPDATED_AT, OffsetDateTime.now())
                 .where(RATINGS.USER_ID.eq(userId))
-                .and(RATINGS.VARIANT.eq(variant.code()))
+                .and(RATINGS.VARIANT.eq(variant))
                 .execute();
     }
 }

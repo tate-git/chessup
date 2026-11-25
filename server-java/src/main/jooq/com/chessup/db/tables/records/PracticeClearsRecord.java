@@ -5,6 +5,7 @@ package com.chessup.db.tables.records;
 
 
 import com.chessup.db.tables.PracticeClears;
+import com.chessup.game.Variant;
 
 import java.util.UUID;
 
@@ -37,15 +38,15 @@ public class PracticeClearsRecord extends UpdatableRecordImpl<PracticeClearsReco
     /**
      * Setter for <code>public.practice_clears.variant</code>.
      */
-    public void setVariant(String value) {
+    public void setVariant(Variant value) {
         set(1, value);
     }
 
     /**
      * Getter for <code>public.practice_clears.variant</code>.
      */
-    public String getVariant() {
-        return (String) get(1);
+    public Variant getVariant() {
+        return (Variant) get(1);
     }
 
     /**
@@ -67,7 +68,7 @@ public class PracticeClearsRecord extends UpdatableRecordImpl<PracticeClearsReco
     // -------------------------------------------------------------------------
 
     @Override
-    public Record2<UUID, String> key() {
+    public Record2<UUID, Variant> key() {
         return (Record2) super.key();
     }
 
@@ -85,7 +86,7 @@ public class PracticeClearsRecord extends UpdatableRecordImpl<PracticeClearsReco
     /**
      * Create a detached, initialised PracticeClearsRecord
      */
-    public PracticeClearsRecord(UUID userId, String variant, Integer level) {
+    public PracticeClearsRecord(UUID userId, Variant variant, Integer level) {
         super(PracticeClears.PRACTICE_CLEARS);
 
         setUserId(userId);

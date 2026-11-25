@@ -5,6 +5,8 @@ package com.chessup.db.tables.records;
 
 
 import com.chessup.db.tables.Games;
+import com.chessup.game.GameResult;
+import com.chessup.game.Variant;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -38,15 +40,15 @@ public class GamesRecord extends UpdatableRecordImpl<GamesRecord> {
     /**
      * Setter for <code>public.games.variant</code>.
      */
-    public void setVariant(String value) {
+    public void setVariant(Variant value) {
         set(1, value);
     }
 
     /**
      * Getter for <code>public.games.variant</code>.
      */
-    public String getVariant() {
-        return (String) get(1);
+    public Variant getVariant() {
+        return (Variant) get(1);
     }
 
     /**
@@ -94,15 +96,15 @@ public class GamesRecord extends UpdatableRecordImpl<GamesRecord> {
     /**
      * Setter for <code>public.games.result</code>.
      */
-    public void setResult(String value) {
+    public void setResult(GameResult value) {
         set(5, value);
     }
 
     /**
      * Getter for <code>public.games.result</code>.
      */
-    public String getResult() {
-        return (String) get(5);
+    public GameResult getResult() {
+        return (GameResult) get(5);
     }
 
     /**
@@ -240,7 +242,7 @@ public class GamesRecord extends UpdatableRecordImpl<GamesRecord> {
     /**
      * Create a detached, initialised GamesRecord
      */
-    public GamesRecord(UUID id, String variant, String timeControl, UUID whiteId, UUID blackId, String result, String reason, String moves, Integer whiteRating, Integer blackRating, Integer whiteChange, Integer blackChange, OffsetDateTime startedAt, OffsetDateTime endedAt) {
+    public GamesRecord(UUID id, Variant variant, String timeControl, UUID whiteId, UUID blackId, GameResult result, String reason, String moves, Integer whiteRating, Integer blackRating, Integer whiteChange, Integer blackChange, OffsetDateTime startedAt, OffsetDateTime endedAt) {
         super(Games.GAMES);
 
         setId(id);

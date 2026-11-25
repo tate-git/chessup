@@ -9,6 +9,8 @@ import com.chessup.db.Keys;
 import com.chessup.db.Public;
 import com.chessup.db.tables.Users.UsersPath;
 import com.chessup.db.tables.records.GamesRecord;
+import com.chessup.game.GameResult;
+import com.chessup.game.Variant;
 
 import java.time.OffsetDateTime;
 import java.util.Arrays;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.jooq.Condition;
+import org.jooq.Converter;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Index;
@@ -69,7 +72,7 @@ public class Games extends TableImpl<GamesRecord> {
     /**
      * The column <code>public.games.variant</code>.
      */
-    public final TableField<GamesRecord, String> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "");
+    public final TableField<GamesRecord, Variant> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "", Converter.ofNullable(String.class, Variant.class, com.chessup.game.Variant::fromCode, com.chessup.game.Variant::code));
 
     /**
      * The column <code>public.games.time_control</code>.
@@ -89,7 +92,7 @@ public class Games extends TableImpl<GamesRecord> {
     /**
      * The column <code>public.games.result</code>.
      */
-    public final TableField<GamesRecord, String> RESULT = createField(DSL.name("result"), SQLDataType.CLOB.nullable(false), this, "");
+    public final TableField<GamesRecord, GameResult> RESULT = createField(DSL.name("result"), SQLDataType.CLOB.nullable(false), this, "", Converter.ofNullable(String.class, GameResult.class, com.chessup.game.GameResult::fromCode, com.chessup.game.GameResult::code));
 
     /**
      * The column <code>public.games.reason</code>.

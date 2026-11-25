@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.chessup.TestDatabase;
 import com.chessup.game.Variant;
+import com.chessup.rating.GlickoRating;
+import com.chessup.rating.PlayerRating;
 import com.chessup.user.UserRepository;
 
 /** 시험마다 넣은 회원·레이팅은 끝나면 되돌림(다른 시험과 같은 DB 를 써서) */
@@ -49,6 +51,15 @@ class LeaderboardRepositoryTest {
                         tuple(2, "bravo", 1700),
                         tuple(2, "charlie", 1700),
                         tuple(4, "delta", 1650));
+    }
+
+    @Test
+    void 랭킹의_표시_레이팅은_대국_화면과_같게_반올림한다() {
+        player("half", 1700.5, 10);
+        var shownInGame = new PlayerRating(new GlickoRating(1700.5, 100, 0.06), 10, 5, 5, 0).shown();
+
+        assertThat(leaderboard.top(Variant.MINI, 1)).extracting(LeaderboardEntry::rating).containsExactly(shownInGame);
+        assertThat(shownInGame).isEqualTo(1701);
     }
 
     @Test
@@ -101,7 +112,7 @@ class LeaderboardRepositoryTest {
         var id = users.create(username, "hash").orElseThrow().id();
         dsl.insertInto(RATINGS)
                 .set(RATINGS.USER_ID, id)
-                .set(RATINGS.VARIANT, Variant.MINI.code())
+                .set(RATINGS.VARIANT, Variant.MINI)
                 .set(RATINGS.RATING, rating)
                 .set(RATINGS.GAMES, games)
                 .set(RATINGS.UPDATED_AT, OffsetDateTime.now())

@@ -8,6 +8,7 @@ import com.chessup.db.Keys;
 import com.chessup.db.Public;
 import com.chessup.db.tables.Users.UsersPath;
 import com.chessup.db.tables.records.PracticeClearsRecord;
+import com.chessup.game.Variant;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.jooq.Condition;
+import org.jooq.Converter;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.InverseForeignKey;
@@ -66,7 +68,7 @@ public class PracticeClears extends TableImpl<PracticeClearsRecord> {
     /**
      * The column <code>public.practice_clears.variant</code>.
      */
-    public final TableField<PracticeClearsRecord, String> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "");
+    public final TableField<PracticeClearsRecord, Variant> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "", Converter.ofNullable(String.class, Variant.class, com.chessup.game.Variant::fromCode, com.chessup.game.Variant::code));
 
     /**
      * The column <code>public.practice_clears.level</code>.

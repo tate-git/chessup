@@ -5,6 +5,7 @@ package com.chessup.db.tables.records;
 
 
 import com.chessup.db.tables.Ratings;
+import com.chessup.game.Variant;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -38,15 +39,15 @@ public class RatingsRecord extends UpdatableRecordImpl<RatingsRecord> {
     /**
      * Setter for <code>public.ratings.variant</code>.
      */
-    public void setVariant(String value) {
+    public void setVariant(Variant value) {
         set(1, value);
     }
 
     /**
      * Getter for <code>public.ratings.variant</code>.
      */
-    public String getVariant() {
-        return (String) get(1);
+    public Variant getVariant() {
+        return (Variant) get(1);
     }
 
     /**
@@ -166,7 +167,7 @@ public class RatingsRecord extends UpdatableRecordImpl<RatingsRecord> {
     // -------------------------------------------------------------------------
 
     @Override
-    public Record2<UUID, String> key() {
+    public Record2<UUID, Variant> key() {
         return (Record2) super.key();
     }
 
@@ -184,7 +185,7 @@ public class RatingsRecord extends UpdatableRecordImpl<RatingsRecord> {
     /**
      * Create a detached, initialised RatingsRecord
      */
-    public RatingsRecord(UUID userId, String variant, Double rating, Double deviation, Double volatility, Integer games, Integer wins, Integer losses, Integer draws, OffsetDateTime updatedAt) {
+    public RatingsRecord(UUID userId, Variant variant, Double rating, Double deviation, Double volatility, Integer games, Integer wins, Integer losses, Integer draws, OffsetDateTime updatedAt) {
         super(Ratings.RATINGS);
 
         setUserId(userId);

@@ -18,11 +18,11 @@ public class GameRepository {
     public void insert(FinishedGame game, RatedGame rated) {
         dsl.insertInto(GAMES)
                 .set(GAMES.ID, game.id())
-                .set(GAMES.VARIANT, game.variant().code())
+                .set(GAMES.VARIANT, game.variant())
                 .set(GAMES.TIME_CONTROL, game.timeControl())
                 .set(GAMES.WHITE_ID, game.whiteId())
                 .set(GAMES.BLACK_ID, game.blackId())
-                .set(GAMES.RESULT, game.result().code())
+                .set(GAMES.RESULT, game.result())
                 .set(GAMES.REASON, game.reason())
                 .set(GAMES.MOVES, String.join(" ", game.moves()))
                 .set(GAMES.WHITE_RATING, rated.whiteRating())

@@ -105,10 +105,10 @@ class GameServiceTest {
     }
 
     private int ratingOf(UUID userId) {
-        return (int) Math.round(dsl.fetchValue(RATINGS.RATING, RATINGS.USER_ID.eq(userId).and(RATINGS.VARIANT.eq("standard"))));
+        return (int) Math.round(dsl.fetchValue(RATINGS.RATING, RATINGS.USER_ID.eq(userId).and(RATINGS.VARIANT.eq(Variant.STANDARD))));
     }
 
     private int gamesOf(UUID userId) {
-        return dsl.fetchValue(RATINGS.GAMES, RATINGS.USER_ID.eq(userId).and(RATINGS.VARIANT.eq("standard")));
+        return dsl.fetchValue(RATINGS.GAMES, RATINGS.USER_ID.eq(userId).and(RATINGS.VARIANT.eq(Variant.STANDARD)));
     }
 }

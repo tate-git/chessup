@@ -177,6 +177,25 @@
                   <name>org.jooq.meta.postgres.PostgresDatabase</name>
                   <inputSchema>public</inputSchema>
                   <excludes>flyway_schema_history</excludes>
+                  <!-- DB 글자 → 자바 enum: 저장소에서 .code() 로 바꿀 필요 없고, 오타는 컴파일에서 막힘 -->
+                  <forcedTypes>
+                    <forcedType>
+                      <userType>com.chessup.game.Variant</userType>
+                      <lambdaConverter>
+                        <from>com.chessup.game.Variant::fromCode</from>
+                        <to>com.chessup.game.Variant::code</to>
+                      </lambdaConverter>
+                      <includeExpression>.*\.variant</includeExpression>
+                    </forcedType>
+                    <forcedType>
+                      <userType>com.chessup.game.GameResult</userType>
+                      <lambdaConverter>
+                        <from>com.chessup.game.GameResult::fromCode</from>
+                        <to>com.chessup.game.GameResult::code</to>
+                      </lambdaConverter>
+                      <includeExpression>.*\.games\.result</includeExpression>
+                    </forcedType>
+                  </forcedTypes>
                 </database>
                 <generate>
                   <records>true</records>

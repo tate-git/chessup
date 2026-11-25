@@ -4,10 +4,10 @@ import static com.chessup.db.Tables.RATINGS;
 import static com.chessup.db.Tables.USERS;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.floor;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.orderBy;
 import static org.jooq.impl.DSL.rank;
-import static org.jooq.impl.DSL.round;
 import static org.jooq.impl.DSL.row;
 import static org.jooq.impl.DSL.rowNumber;
 import static org.jooq.impl.DSL.select;
@@ -35,10 +35,12 @@ public class LeaderboardRepository {
     /** 내 순위 앞뒤로 몇 명 */
     public static final int RADIUS = 5;
 
-    private static final Field<Integer> RATING = round(RATINGS.RATING).cast(Integer.class).as("rating");
-    private static final Field<Integer> RANK = rank().over(orderBy(round(RATINGS.RATING).desc())).as("rank");
+    /** 표시 레이팅: Java Math.round 와 같게 0.5 는 올림(PostgreSQL 실수 round 는 짝수 쪽이라 1700.5 → 1700) */
+    private static final Field<Integer> SHOWN = floor(RATINGS.RATING.plus(0.5)).cast(Integer.class);
+    private static final Field<Integer> RATING = SHOWN.as("rating");
+    private static final Field<Integer> RANK = rank().over(orderBy(SHOWN.desc())).as("rank");
     /** 같은 순위 안에서도 줄 세우기(앞뒤 몇 명을 자를 때 씀) */
-    private static final Field<Integer> POSITION = rowNumber().over(orderBy(round(RATINGS.RATING).desc(), USERS.USERNAME_KEY)).as("position");
+    private static final Field<Integer> POSITION = rowNumber().over(orderBy(SHOWN.desc(), USERS.USERNAME_KEY)).as("position");
     private static final Field<Integer> PLAYERS = count().over().as("players");
 
     private final DSLContext dsl;
@@ -81,7 +83,7 @@ public class LeaderboardRepository {
                 select(RATINGS.USER_ID, USERS.USERNAME, RATING, RATINGS.GAMES, RANK, POSITION, PLAYERS)
                         .from(RATINGS)
                         .join(USERS).on(USERS.ID.eq(RATINGS.USER_ID))
-                        .where(RATINGS.VARIANT.eq(variant.code()))
+                        .where(RATINGS.VARIANT.eq(variant))
                         .and(RATINGS.GAMES.ge(MIN_GAMES)));
     }
 

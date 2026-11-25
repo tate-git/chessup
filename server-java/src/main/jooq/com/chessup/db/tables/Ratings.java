@@ -9,6 +9,7 @@ import com.chessup.db.Keys;
 import com.chessup.db.Public;
 import com.chessup.db.tables.Users.UsersPath;
 import com.chessup.db.tables.records.RatingsRecord;
+import com.chessup.game.Variant;
 
 import java.time.OffsetDateTime;
 import java.util.Arrays;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import org.jooq.Check;
 import org.jooq.Condition;
+import org.jooq.Converter;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Index;
@@ -70,7 +72,7 @@ public class Ratings extends TableImpl<RatingsRecord> {
     /**
      * The column <code>public.ratings.variant</code>.
      */
-    public final TableField<RatingsRecord, String> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "");
+    public final TableField<RatingsRecord, Variant> VARIANT = createField(DSL.name("variant"), SQLDataType.CLOB.nullable(false), this, "", Converter.ofNullable(String.class, Variant.class, com.chessup.game.Variant::fromCode, com.chessup.game.Variant::code));
 
     /**
      * The column <code>public.ratings.rating</code>.
