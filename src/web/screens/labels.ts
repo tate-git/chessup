@@ -2,7 +2,7 @@
 import type { EndReason, VariantId } from '../../shared/protocol';
 import { t } from '../i18n';
 
-export const variantLabel = (variant: VariantId) => (variant === 'standard' ? t('정통 체스', 'Chess') : t('미니 체스 5×5', 'Mini chess 5×5'));
+export const variantLabel = (variant: VariantId) => (variant === 'standard' ? t('정통 체스', 'Chess') : t('미니 체스 6×6', 'Mini chess 6×6'));
 
 export function endReasonLabel(reason: EndReason): string {
   const labels: Record<EndReason, () => string> = {

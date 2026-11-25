@@ -2,7 +2,7 @@
 
 [한국어](README.md) · **English**
 
-A web game for climbing the ratings in standard chess and mini chess (Gardner 5×5).
+A web game for climbing the ratings in standard chess and mini chess (Los Alamos 6×6).
 
 ▶ **Play: not deployed yet** — see "Run" below.
 
@@ -14,7 +14,7 @@ A web game for climbing the ratings in standard chess and mini chess (Gardner 5�
 
 ## Rules
 
-- Standard chess rules. Mini chess is played on a 5×5 board (Gardner setup).
+- Standard chess rules. Mini chess is Los Alamos chess on a 6×6 board (no bishops; no pawn double step, castling or en passant; no promotion to bishop).
 - Only live games against people count for rating (Glicko-2), rated separately for standard and mini. The server keeps the clock.
 - Hints are for bot games only: once per game until you've played 20 games against people, then once a day.
 

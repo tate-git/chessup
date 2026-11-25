@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { legalMoves } from '../src/engine/movegen';
 import { Position } from '../src/engine/position';
+import { KNIGHT, QUEEN, ROOK } from '../src/engine/pieces';
 import { VARIANTS } from '../src/engine/variants';
 
 function perft(position: Position, depth: number): number {
@@ -31,12 +32,24 @@ describe('정통 체스 perft', () => {
   });
 });
 
-describe('미니 체스(5×5)', () => {
-  it('처음 국면에서 백은 7수', () => {
-    expect(legalMoves(Position.fromFen(VARIANTS.mini)).length).toBe(7);
+describe('미니 체스(로스앨러모스 6×6)', () => {
+  const mini = (fen?: string) => Position.fromFen(VARIANTS.mini, fen);
+
+  it('처음 국면: 백은 폰 한 칸 6수 + 나이트 4수 = 10수 · 두 수 뒤 100국면(서로 닿지 않음)', () => {
+    expect(perft(mini(), 1)).toBe(10);
+    expect(perft(mini(), 2)).toBe(100);
+  });
+
+  it('폰은 두 칸 못 감', () => {
+    expect(legalMoves(mini()).filter(move => move.from === 7 && move.to === 19)).toHaveLength(0);
+  });
+
+  it('승진은 퀸·룩·나이트만(비숍 없음)', () => {
+    const promotions = legalMoves(mini('3k2/P5/6/6/6/3K2 w - - 0 1')).filter(move => move.promotion !== 0);
+    expect(promotions.map(move => Math.abs(move.promotion)).sort()).toEqual([QUEEN, ROOK, KNIGHT].sort());
   });
   it('수를 두고 물리면 원래 국면', () => {
-    const position = Position.fromFen(VARIANTS.mini);
+    const position = mini();
     const before = position.toFen();
     perft(position, 4);
     expect(position.toFen()).toBe(before);

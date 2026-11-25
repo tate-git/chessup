@@ -38,7 +38,7 @@ describe('대국 판정', () => {
   it('물리기', () => {
     const game = new Game('mini');
     const start = game.position.toFen();
-    playAll(game, ['b2b3', 'c4b3']);
+    playAll(game, ['b2b3', 'c5c4']);
     game.undo();
     game.undo();
     expect(game.position.toFen()).toBe(start);
