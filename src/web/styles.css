@@ -177,10 +177,11 @@ button, a.button {
     background: transparent;
     color: var(--muted);
     font-weight: 600;
-    transition: transform 0.15s, color 0.15s;
+    transition: color 0.15s;   /* 크기·밝기는 스크립트가 매 프레임 */
+    cursor: grab;
   }
   & .wheel-item small { min-height: 1.2em; font-size: 12px; }
-  & .wheel-item[aria-selected="true"] { color: var(--ink); background: var(--panel); border-color: var(--line); transform: scale(1.15); }
+  & .wheel-item[aria-selected="true"] { color: var(--ink); background: var(--panel); border-color: var(--line); }
 }
 
 a.button.wide { display: block; }
