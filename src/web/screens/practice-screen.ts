@@ -24,7 +24,7 @@ export const practiceScreen = (level: number): Screen => async root => {
         <a href="#/" class="back">← ${t('홈', 'Home')}</a>
         <span>${variantLabel(variant)} · 🤖 ${t(`봇 ${level}단`, `Bot level ${level}`)}</span>
       </header>
-      <div class="table practice">
+      <div class="table slim">
         <div class="board-stack">
           <div class="board-wrap"><div id="board"></div></div>
           <p id="status" class="sr-only" aria-live="polite"></p>

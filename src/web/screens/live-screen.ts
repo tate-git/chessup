@@ -3,7 +3,7 @@ import type { Color, GameSummary } from '../../shared/protocol';
 import { t } from '../i18n';
 import { LiveSession } from '../live-session';
 import { session } from '../session';
-import { query } from '../ui/dom';
+import { actionLabel, query } from '../ui/dom';
 import { endReasonLabel, timeControlLabel, variantLabel } from './labels';
 import type { Screen } from './screen';
 
@@ -14,23 +14,23 @@ export const liveScreen = (gameId: string): Screen => root => {
         <a href="#/" class="back">← ${t('홈', 'Home')}</a>
         <span id="title"></span>
       </header>
-      <div class="table">
+      <div class="table slim">
         <div class="board-column">
           <div class="player-bar"><span id="top-player"></span><span id="top-clock" class="clock"></span></div>
           <div class="board-wrap"><div id="board"></div></div>
           <div class="player-bar"><span id="bottom-player"></span><span id="bottom-clock" class="clock"></span></div>
+          <p id="status" class="status"></p>
+          <div id="draw-buttons" class="board-actions two" hidden>
+            <button type="button" class="primary" data-action="accept">${actionLabel('🤝', t('무승부 수락', 'Accept draw'))}</button>
+            <button type="button" data-action="decline">${actionLabel('✋', t('거절', 'Decline'))}</button>
+          </div>
+          <div class="board-actions two">
+            <button type="button" data-action="offer">${actionLabel('🤝', t('무승부 제안', 'Offer draw'))}</button>
+            <button type="button" data-action="resign">${actionLabel('🏳️', t('기권', 'Resign'))}</button>
+          </div>
         </div>
         <aside class="side">
-          <p id="status" class="status"></p>
-          <div id="draw-buttons" class="controls" hidden>
-            <button type="button" class="primary" data-action="accept">🤝 ${t('무승부 수락', 'Accept draw')}</button>
-            <button type="button" data-action="decline">${t('거절', 'Decline')}</button>
-          </div>
           <ol id="moves" class="moves"></ol>
-          <div class="controls">
-            <button type="button" data-action="offer">🤝 ${t('무승부 제안', 'Offer draw')}</button>
-            <button type="button" data-action="resign">🏳️ ${t('기권', 'Resign')}</button>
-          </div>
         </aside>
       </div>
       <dialog id="result" class="result"></dialog>
