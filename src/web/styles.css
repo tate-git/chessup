@@ -196,8 +196,10 @@ button.wide { display: block; width: 100%; }
   padding: 10px 12px 24px;
 }
 
+/* 게임 화면 머리줄: 「← 홈」 왼쪽 · 제목 오른쪽 */
 .play-bar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
