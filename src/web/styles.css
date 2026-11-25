@@ -5,11 +5,11 @@
   --ink: #1f2421;
   --muted: #6b726d;
   --line: #e3ded3;
-  /* 흑백: 강조는 검정, 판은 회색 두 단계 */
+  /* 강조는 검정(흑백) · 판은 나무 갈색 두 단계 */
   --accent: #1f2421;
   --accent-ink: #ffffff;
-  --square-light: #ececec;
-  --square-dark: #a2a2a2;
+  --square-light: #f0d9b5;
+  --square-dark: #b58863;
   --highlight: rgb(255 214 10 / 0.45);
   --check: radial-gradient(circle, rgb(255 40 40 / 0.85) 0%, rgb(255 40 40 / 0) 70%);
   --radius: 14px;
