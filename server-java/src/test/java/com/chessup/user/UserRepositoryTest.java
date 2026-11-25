@@ -21,7 +21,7 @@ class UserRepositoryTest {
         var created = users.create("Magnus", "hash").orElseThrow();
 
         assertThat(users.findByUsername("magnus")).contains(created);
-        assertThat(users.findPasswordHash("MAGNUS")).contains("hash");
+        assertThat(users.findLogin("MAGNUS")).contains(new Login(created, "hash"));
     }
 
     @Test
