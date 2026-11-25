@@ -274,6 +274,7 @@ button.wide { display: block; width: 100%; }
 
   & button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; font-size: 13px; white-space: nowrap; }
   & .action-icon { font-size: 18px; line-height: 1; }
+  & .action-note { font-size: 11px; color: var(--muted); }
 }
 .controls[hidden] { display: none; }
 

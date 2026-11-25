@@ -167,9 +167,9 @@ export class PracticeSession {
   #updateButtons(): void {
     const hints = this.setup.hints.remaining;
     this.view.hintButton.disabled = hints <= 0 || !this.#isPlayerTurn();
-    this.view.hintButton.innerHTML = actionLabel('💡', `${t('힌트', 'Hint')} ${Math.max(0, hints)}`);
+    this.view.hintButton.innerHTML = actionLabel('💡', t('힌트', 'Hint'), chancesLeft(Math.max(0, hints)));
     this.view.undoButton.disabled = !this.#canUndo();
-    this.view.undoButton.innerHTML = actionLabel('↩️', `${t('뒤로가기', 'Take back')} ${this.#undosLeft}`);
+    this.view.undoButton.innerHTML = actionLabel('↩️', t('뒤로가기', 'Take back'), chancesLeft(this.#undosLeft));
     const note = t('한 판에 3번 · 쓰고 이기면 격파에 🤝 표시', '3 per game · wins using it are marked 🤝');
     this.view.hintButton.title = note;
     this.view.undoButton.title = note;
@@ -178,3 +178,6 @@ export class PracticeSession {
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+
+/** 「기회 3번」 */
+const chancesLeft = (count: number) => t(`기회 ${count}번`, `${count} left`);
