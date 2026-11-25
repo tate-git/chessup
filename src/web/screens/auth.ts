@@ -16,11 +16,11 @@ export const authScreen: Screen = root => {
         <form class="card" novalidate>
           <label>${t('아이디', 'Username')}<input name="username" autocomplete="username" required minlength="2" maxlength="16" pattern="[A-Za-z0-9_가-힣]+"></label>
           <label>${t('비밀번호', 'Password')}<input name="password" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="8" maxlength="72"></label>
-          ${signup ? `<p class="muted small">${t('아이디 2~16자(한글·영문·숫자·_) · 비밀번호 8자 이상 · 이메일 같은 개인정보는 받지 않아요(비밀번호를 잊으면 찾을 수 없어요)', 'Username 2–16 chars · password 8+ chars · no email collected (lost passwords cannot be recovered)')}</p>` : ''}
+          ${signup ? `<p class="muted small">${t('아이디 2~16자 · 비밀번호 8자 이상', 'Username 2–16 chars · password 8+ chars')}<br>${t('이메일을 받지 않아 비밀번호는 찾을 수 없어요', 'No email, so passwords can’t be recovered')}</p>` : ''}
           <p class="error" role="alert"></p>
-          <button type="submit" class="primary">${signup ? t('가입하기', 'Create account') : t('로그인', 'Log in')}</button>
+          <button type="submit" class="primary">${signup ? t('가입하기', 'Sign up') : t('로그인', 'Log in')}</button>
         </form>
-        <button type="button" class="ghost" data-action="toggle">${signup ? t('이미 계정이 있어요 → 로그인', 'Have an account? Log in') : t('처음이에요 → 회원가입', 'New here? Sign up')}</button>
+        <button type="button" class="ghost" data-action="toggle">${signup ? t('로그인', 'Log in') : t('회원가입', 'Sign up')}</button>
       </section>`;
     const form = query<HTMLFormElement>(root, 'form');
     form.onsubmit = async event => {
