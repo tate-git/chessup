@@ -136,6 +136,44 @@ describe('게스트 · 한 줄 매칭', () => {
     expect((await member.request('GET', '/api/me')).json.ratings.standard.games).toBe(1);
     expect((await member.request('GET', `/api/games/${gameId}`)).status).toBe(404);
   });
+
+  it('게스트 이름: 정하면 그 이름 · 형식이 틀리면 400 · 쿠키 없으면 GET 은 null', async () => {
+    expect((await TestUser.fresh('x').request('GET', '/api/auth/guest')).json).toBeNull();
+    const guest = await asGuest();
+    expect((await guest.request('GET', '/api/auth/guest')).json.named).toBe(false);
+    expect((await guest.request('POST', '/api/auth/guest', { name: 'a' })).status).toBe(400);
+    const name = `n${crypto.randomUUID().slice(0, 8)}`;
+    expect((await guest.request('POST', '/api/auth/guest', { name })).json).toEqual({ username: name, named: true });
+    expect((await guest.request('GET', '/api/auth/guest')).json).toEqual({ username: name, named: true });
+  });
+
+  it('이번 주 랭킹: 회원·게스트 모두 승점(승 1) · 본인 표시 · 게스트가 가입하면 이어받음', async () => {
+    const member = TestUser.fresh('m');
+    await member.signup();
+    const guest = await asGuest();
+    const guestName = `w${crypto.randomUUID().slice(0, 8)}`;
+    await guest.request('POST', '/api/auth/guest', { name: guestName });
+    const { gameId, white, black } = await pair(member, guest);
+    await foolsMate(gameId, white, black);   // 흑 승
+    const winner = black === member ? member.username : guestName;
+    const loser = winner === member.username ? guestName : member.username;
+
+    const board = (await guest.request('GET', '/api/leaderboard/weekly?variant=standard')).json;
+    expect(board.weekStart).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const row = (name: string) => board.entries.find((entry: { username: string }) => entry.username === name);
+    expect(row(winner)).toMatchObject({ points: 1, games: 1, wins: 1 });
+    expect(row(loser)).toMatchObject({ points: 0, games: 1, wins: 0 });
+    expect(row(guestName)).toMatchObject({ guest: true, mine: true });
+    expect(row(member.username)).toMatchObject({ guest: false, mine: false });
+
+    // 게스트가 가입: 같은 쿠키로 가입하면 이번 주 결과가 회원 이름으로
+    const joined = new TestUser(`j${crypto.randomUUID().slice(0, 8)}`);
+    joined.adoptCookieFrom(guest);
+    await joined.signup();
+    const after = (await joined.request('GET', '/api/leaderboard/weekly?variant=standard')).json.entries;
+    expect(after.find((entry: { username: string }) => entry.username === guestName)).toBeUndefined();
+    expect(after.find((entry: { username: string }) => entry.username === joined.username)).toMatchObject({ guest: false, games: 1, mine: true });
+  });
 });
 
 describe('방 번호', () => {

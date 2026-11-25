@@ -7,6 +7,7 @@ package com.chessup.db;
 import com.chessup.db.tables.Games;
 import com.chessup.db.tables.HintUses;
 import com.chessup.db.tables.LoginFailures;
+import com.chessup.db.tables.MatchResults;
 import com.chessup.db.tables.PracticeClears;
 import com.chessup.db.tables.Ratings;
 import com.chessup.db.tables.Sessions;
@@ -33,6 +34,11 @@ public class Tables {
      * The table <code>public.login_failures</code>.
      */
     public static final LoginFailures LOGIN_FAILURES = LoginFailures.LOGIN_FAILURES;
+
+    /**
+     * The table <code>public.match_results</code>.
+     */
+    public static final MatchResults MATCH_RESULTS = MatchResults.MATCH_RESULTS;
 
     /**
      * The table <code>public.practice_clears</code>.

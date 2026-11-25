@@ -21,14 +21,16 @@ export const homeScreen: Screen = async root => {
     document.documentElement.lang = lang;
     document.title = t('체스업', 'Chessup');
     const variant = settings.variant;
-    const progress = await loadCleared();
+    const [progress, guest] = await Promise.all([loadCleared(), session.me ? null : api.currentGuest()]);
     const cleared = progress.cleared[variant];
     const unassisted = progress.unassisted[variant];
     root.innerHTML = `
       <section class="home">
         <nav class="topnav">
           <a href="#/leaderboard">🏆 ${t('랭킹', 'Ranking')}</a>
-          ${session.me ? `<span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
+          ${session.me ? `<span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : ''}
+          ${guest ? `<button type="button" class="me" data-action="rename" title="${t('게스트 이름 바꾸기', 'Change guest name')}">👤 <b>${escapeHtml(guest.username)}</b></button>` : ''}
+          ${session.me ? '' : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
           <button type="button" data-action="lang" class="ghost">${t('🌐 English', '🌐 한국어')}</button>
         </nav>
         <header class="hero">
@@ -100,8 +102,39 @@ export const homeScreen: Screen = async root => {
     navigate(`#/live/${gameId}`);
   };
 
-  /** 로그인 안 했으면 게스트로 시작(쿠키) · 게스트 이름 */
-  const ensurePlayer = async () => (session.me ? null : (await api.guest()).username);
+  /** 게스트 이름 받기(대국 시작 전 · 이름 바꾸기) · 정한 이름 */
+  const askGuestName = (suggested: string) =>
+    new Promise<string>(resolve => {
+      const dialog = query<HTMLDialogElement>(root, '#seeking');
+      dialog.innerHTML = `<p class="result-icon">👤</p><h2>${t('뭐라고 부를까요?', 'What should we call you?')}</h2>
+        <p class="muted">${t('이번 주 랭킹에 이 이름으로 올라가요 · 2~12자 한글·영문·숫자', 'Shown on this week\'s ranking · 2–12 letters or numbers')}</p>
+        <form class="guest-name stack" novalidate>
+          <input name="name" maxlength="12" value="${escapeHtml(suggested)}" autocomplete="nickname" aria-label="${t('이름', 'Name')}">
+          <p class="error small" role="alert"></p>
+          <button type="submit" class="primary wide">${t('이 이름으로 시작', 'Use this name')}</button>
+        </form>
+        <div class="row"><button type="button" data-action="cancel-seek">${t('취소', 'Cancel')}</button></div>`;
+      if (!dialog.open) dialog.showModal();
+      const form = query<HTMLFormElement>(dialog, 'form');
+      const input = query<HTMLInputElement>(form, 'input');
+      input.select();
+      form.onsubmit = async event => {
+        event.preventDefault();
+        const name = input.value.trim();
+        if (!/^[A-Za-z0-9_가-힣]{2,12}$/.test(name)) {
+          query(form, '.error').textContent = t('2~12자 한글·영문·숫자·_ 로 해 주세요', 'Use 2–12 letters, numbers or _');
+          return;
+        }
+        resolve((await api.guest(name)).username);
+      };
+    });
+
+  /** 로그인 안 했으면 게스트로 시작(쿠키) · 이름을 아직 안 정했으면 먼저 받음 · 게스트 이름 */
+  const ensurePlayer = async () => {
+    if (session.me) return null;
+    const guest = await api.guest();
+    return guest.named ? guest.username : askGuestName(guest.username);
+  };
 
   const startSeeking = async (timeControl: TimeControl) => {
     const guestName = await ensurePlayer();
@@ -194,6 +227,12 @@ export const homeScreen: Screen = async root => {
     if (timeControl) return startSeeking(timeControl as TimeControl);
     if (roomTime) return openRoom(roomTime as TimeControl);
     if (action === 'room') return chooseRoomTime();
+    if (action === 'rename') {
+      const current = await api.currentGuest();
+      await askGuestName(current?.username ?? '');
+      query<HTMLDialogElement>(root, '#seeking').close();
+      return render();
+    }
     if (action === 'share-room') return shareRoom(button);
     if (action === 'cancel-seek') return stopSeeking();
     if (button.closest('form')) return;   // 방 들어가기는 아래 onsubmit

@@ -7,6 +7,7 @@ package com.chessup.db;
 import com.chessup.db.tables.Games;
 import com.chessup.db.tables.HintUses;
 import com.chessup.db.tables.LoginFailures;
+import com.chessup.db.tables.MatchResults;
 import com.chessup.db.tables.PracticeClears;
 import com.chessup.db.tables.Ratings;
 import com.chessup.db.tables.Sessions;
@@ -14,6 +15,7 @@ import com.chessup.db.tables.Users;
 import com.chessup.db.tables.records.GamesRecord;
 import com.chessup.db.tables.records.HintUsesRecord;
 import com.chessup.db.tables.records.LoginFailuresRecord;
+import com.chessup.db.tables.records.MatchResultsRecord;
 import com.chessup.db.tables.records.PracticeClearsRecord;
 import com.chessup.db.tables.records.RatingsRecord;
 import com.chessup.db.tables.records.SessionsRecord;
@@ -40,6 +42,7 @@ public class Keys {
 
     public static final UniqueKey<GamesRecord> GAMES_PKEY = Internal.createUniqueKey(Games.GAMES, DSL.name("games_pkey"), new TableField[] { Games.GAMES.ID }, true);
     public static final UniqueKey<LoginFailuresRecord> LOGIN_FAILURES_PKEY = Internal.createUniqueKey(LoginFailures.LOGIN_FAILURES, DSL.name("login_failures_pkey"), new TableField[] { LoginFailures.LOGIN_FAILURES.KEY }, true);
+    public static final UniqueKey<MatchResultsRecord> MATCH_RESULTS_PKEY = Internal.createUniqueKey(MatchResults.MATCH_RESULTS, DSL.name("match_results_pkey"), new TableField[] { MatchResults.MATCH_RESULTS.GAME_ID, MatchResults.MATCH_RESULTS.PLAYER_ID }, true);
     public static final UniqueKey<PracticeClearsRecord> PRACTICE_CLEARS_PKEY = Internal.createUniqueKey(PracticeClears.PRACTICE_CLEARS, DSL.name("practice_clears_pkey"), new TableField[] { PracticeClears.PRACTICE_CLEARS.USER_ID, PracticeClears.PRACTICE_CLEARS.VARIANT }, true);
     public static final UniqueKey<RatingsRecord> RATINGS_PKEY = Internal.createUniqueKey(Ratings.RATINGS, DSL.name("ratings_pkey"), new TableField[] { Ratings.RATINGS.USER_ID, Ratings.RATINGS.VARIANT }, true);
     public static final UniqueKey<SessionsRecord> SESSIONS_PKEY = Internal.createUniqueKey(Sessions.SESSIONS, DSL.name("sessions_pkey"), new TableField[] { Sessions.SESSIONS.TOKEN_HASH }, true);

@@ -2,7 +2,8 @@
 export const API_BASE = process.env.API_BASE ?? 'http://localhost:8799';
 
 export class TestUser {
-  #cookie = '';
+  /** 이름 → 값(게스트는 gid · gname, 회원은 sid) */
+  readonly #cookies = new Map<string, string>();
 
   constructor(readonly username: string, readonly password = 'correct-horse-9') {}
 
@@ -13,13 +14,27 @@ export class TestUser {
   async request(method: string, path: string, body?: unknown): Promise<{ status: number; json: any }> {
     const response = await fetch(API_BASE + path, {
       method,
-      headers: { 'Content-Type': 'application/json', Cookie: this.#cookie },
+      headers: { 'Content-Type': 'application/json', Cookie: this.#cookieHeader() },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    const setCookie = response.headers.get('set-cookie');
-    if (setCookie) this.#cookie = setCookie.split(';')[0];
+    for (const line of response.headers.getSetCookie()) {
+      const [pair] = line.split(';');
+      const [name, ...value] = pair.split('=');
+      const deleted = /max-age=0|expires=thu, 01 jan 1970/i.test(line);
+      if (deleted) this.#cookies.delete(name.trim());
+      else this.#cookies.set(name.trim(), value.join('='));
+    }
     const text = await response.text();
     return { status: response.status, json: text ? JSON.parse(text) : null };
+  }
+
+  /** 다른 시험 사용자의 쿠키(게스트 등)를 이어받음 */
+  adoptCookieFrom(other: TestUser): void {
+    for (const [name, value] of other.#cookies) this.#cookies.set(name, value);
+  }
+
+  #cookieHeader(): string {
+    return [...this.#cookies].map(([name, value]) => `${name}=${value}`).join('; ');
   }
 
   signup() {
@@ -32,7 +47,7 @@ export class TestUser {
 
   /** 받은 글을 차례로 꺼낼 수 있는 WebSocket */
   async connect(path: string): Promise<LiveSocket> {
-    const socket = new WebSocket(API_BASE.replace(/^http/, 'ws') + path, { headers: { Cookie: this.#cookie } } as unknown as string[]);
+    const socket = new WebSocket(API_BASE.replace(/^http/, 'ws') + path, { headers: { Cookie: this.#cookieHeader() } } as unknown as string[]);
     const live = new LiveSocket(socket);
     await new Promise((resolve, reject) => {
       socket.addEventListener('open', resolve, { once: true });

@@ -6,6 +6,7 @@ package com.chessup.db;
 
 import com.chessup.db.tables.Games;
 import com.chessup.db.tables.HintUses;
+import com.chessup.db.tables.MatchResults;
 import com.chessup.db.tables.Ratings;
 import com.chessup.db.tables.Sessions;
 
@@ -28,6 +29,8 @@ public class Indexes {
     public static final Index GAMES_BLACK = Internal.createIndex(DSL.name("games_black"), Games.GAMES, new OrderField[] { Games.GAMES.BLACK_ID, Games.GAMES.ENDED_AT.desc() }, false);
     public static final Index GAMES_WHITE = Internal.createIndex(DSL.name("games_white"), Games.GAMES, new OrderField[] { Games.GAMES.WHITE_ID, Games.GAMES.ENDED_AT.desc() }, false);
     public static final Index HINT_USES_DAY = Internal.createIndex(DSL.name("hint_uses_day"), HintUses.HINT_USES, new OrderField[] { HintUses.HINT_USES.USER_ID, HintUses.HINT_USES.DAY }, false);
+    public static final Index MATCH_RESULTS_PLAYER = Internal.createIndex(DSL.name("match_results_player"), MatchResults.MATCH_RESULTS, new OrderField[] { MatchResults.MATCH_RESULTS.PLAYER_ID }, false);
+    public static final Index MATCH_RESULTS_WEEK = Internal.createIndex(DSL.name("match_results_week"), MatchResults.MATCH_RESULTS, new OrderField[] { MatchResults.MATCH_RESULTS.VARIANT, MatchResults.MATCH_RESULTS.WEEK_START }, false);
     public static final Index RATINGS_LEADERBOARD = Internal.createIndex(DSL.name("ratings_leaderboard"), Ratings.RATINGS, new OrderField[] { Ratings.RATINGS.VARIANT, Ratings.RATINGS.RATING.desc() }, false);
     public static final Index SESSIONS_USER = Internal.createIndex(DSL.name("sessions_user"), Sessions.SESSIONS, new OrderField[] { Sessions.SESSIONS.USER_ID }, false);
 }

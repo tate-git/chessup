@@ -176,7 +176,7 @@ export class LiveSession {
     });
     const bottom: Color = state.you === 'black' ? 'black' : 'white';
     const top: Color = bottom === 'white' ? 'black' : 'white';
-    const player = (color: Color) => `${color === 'white' ? '⚪' : '⚫'} <b>${escapeHtml(state[color].username)}</b> ${state[color].rating === undefined ? '' : `<span class="muted">${state[color].rating}</span>`}`;
+    const player = (color: Color) => `${color === 'white' ? '⚪' : '⚫'} <b>${escapeHtml(state[color].username)}</b> ${state[color].guest ? `<span class="tag">${t('게스트', 'Guest')}</span>` : ''}${state[color].rating === undefined ? '' : `<span class="muted">${state[color].rating}</span>`}`;
     this.view.topPlayer.innerHTML = player(top);
     this.view.bottomPlayer.innerHTML = player(bottom);
     this.view.moves.innerHTML = moveListHtml(game.history.map(played => played.san));

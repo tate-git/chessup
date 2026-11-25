@@ -55,14 +55,23 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /api/auth/guest:
-    post:
+    get:
       tags: [auth]
-      summary: 게스트로 시작(가입 없이 대국) — gid 쿠키(30일) · 이미 있으면 같은 이름 · id·이름은 쿠키 토큰에서 만들어 DB 에 저장 안 함 · 게스트는 레이팅 없음(1500 으로 셈)
+      summary: 지금 게스트(쿠키 없으면 null · 새로 만들지 않음)
       security: []
       responses:
-        '200':
-          description: 게스트 이름
-          content: { application/json: { schema: { type: object, required: [username], properties: { username: { type: string, example: 게스트0421 } } } } }
+        '200': { description: 게스트 또는 null, content: { application/json: { schema: { $ref: '#/components/schemas/GuestInfo' } } } }
+    post:
+      tags: [auth]
+      summary: 게스트로 시작(가입 없이 대국) — gid 쿠키(1년, 기기 id 처럼) · name 을 주면 이름 바꿈(gname 쿠키) · 안 정하면 게스트0000 · DB 에 저장 안 함 · 레이팅 없음(1500 으로 셈) · 가입하면 이번 주 결과를 이어받음
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { name: { type: string, pattern: '^[A-Za-z0-9_가-힣]{2,12}$' } } }
+      responses:
+        '200': { description: 게스트, content: { application/json: { schema: { $ref: '#/components/schemas/GuestInfo' } } } }
+        '400': { $ref: '#/components/responses/InvalidInput' }
 
   /api/auth/logout:
     post:
@@ -90,6 +99,26 @@ paths:
       responses:
         '200': { description: 프로필, content: { application/json: { schema: { $ref: '#/components/schemas/Profile' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/leaderboard/weekly:
+    get:
+      tags: [users]
+      summary: 이번 주 랭킹(한국 월요일 0시부터) — 승점(승 1 · 무 0.5) · 회원·게스트 모두 · 같은 승점이면 같은 순위
+      parameters:
+        - { name: variant, in: query, required: true, schema: { $ref: '#/components/schemas/VariantId' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: 이번 주 랭킹
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [variant, weekStart, entries]
+                properties:
+                  variant: { $ref: '#/components/schemas/VariantId' }
+                  weekStart: { type: string, format: date, description: 이번 주 월요일(한국 날짜) }
+                  entries: { type: array, items: { $ref: '#/components/schemas/WeeklyEntry' } }
 
   /api/leaderboard:
     get:
@@ -275,6 +304,24 @@ components:
         rating: { type: integer }
         games: { type: integer }
 
+    GuestInfo:
+      type: object
+      nullable: true
+      required: [username, named]
+      properties:
+        username: { type: string, example: 앨리스 }
+        named: { type: boolean, description: 이름을 직접 정했는지(false 면 게스트0000) }
+    WeeklyEntry:
+      type: object
+      required: [rank, username, guest, points, games, wins, mine]
+      properties:
+        rank: { type: integer }
+        username: { type: string, description: 그 주 마지막 판 때 이름 }
+        guest: { type: boolean }
+        points: { type: number, description: 승 1 · 무 0.5 }
+        games: { type: integer }
+        wins: { type: integer }
+        mine: { type: boolean, description: 보고 있는 사람 본인(회원 세션 또는 게스트 쿠키) }
     HintAllowance:
       type: object
       required: [remaining]
@@ -299,6 +346,7 @@ components:
       properties:
         username: { type: string }
         rating: { type: integer, description: 대국 시작 때 레이팅(게스트는 없음) }
+        guest: { type: boolean, description: 게스트면 true }
         ratingChange: { type: integer, description: 끝난 뒤 오르내린 값(진행 중이면 없음) }
     GameSummary:
       type: object

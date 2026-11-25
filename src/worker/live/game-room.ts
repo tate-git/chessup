@@ -4,6 +4,7 @@ import { Game, type EndReason as EngineEndReason } from '../../engine/game';
 import { parseTimeControl, type Clocks, type Color, type EndReason, type GameClientMessage, type GameResult, type GameServerMessage, type GameSummary, type LiveGame, type TimeControl } from '../../shared/protocol';
 import type { VariantId } from '../../engine/variants';
 import { insertGameStatement } from '../db/games';
+import { resultStatements, type ResultPlayer } from '../db/weekly';
 import { freshRating, loadRating, saveRatingStatement, type RatingRow } from '../db/ratings';
 import type { Env } from '../env';
 import { updateRating } from '../rating/glicko2';
@@ -151,7 +152,7 @@ export class GameRoom extends DurableObject<Env> {
     const endedAt = new Date().toISOString();
     const change = (before: RatingRow, after: RatingRow) => Math.round(after.rating) - Math.round(before.rating);
     const info = (player: PlayerState, after: RatingRow) =>
-      isMember(player) ? { username: player.username, rating: Math.round(player.rating.rating), ratingChange: change(player.rating, after) } : { username: player.username };
+      isMember(player) ? { username: player.username, rating: Math.round(player.rating.rating), ratingChange: change(player.rating, after) } : { username: player.username, guest: true };
     const summary: GameSummary = {
       id: game.id,
       variant: game.variant,
@@ -176,8 +177,10 @@ export class GameRoom extends DurableObject<Env> {
         })] : []),
         ...(isMember(game.white) ? [saveRatingStatement(db, game.white.id, whiteAfter)] : []),
         ...(isMember(game.black) ? [saveRatingStatement(db, game.black.id, blackAfter)] : []),
+        // 이번 주 랭킹(게스트 포함)
+        ...resultStatements(db, { id: game.id, variant: game.variant, result, endedAt }, resultPlayer(game.white), resultPlayer(game.black)),
       ];
-      if (statements.length > 0) await db.batch(statements);
+      await db.batch(statements);
     }
     game.ended = summary;
     await this.#save(game);
@@ -190,7 +193,7 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   #liveView(game: StoredGame, seat: Seat): LiveGame {
-    const player = (state: PlayerState) => (isMember(state) ? { username: state.username, rating: Math.round(state.rating.rating) } : { username: state.username });
+    const player = (state: PlayerState) => (isMember(state) ? { username: state.username, rating: Math.round(state.rating.rating) } : { username: state.username, guest: true });
     return {
       id: game.id,
       variant: game.variant,
@@ -274,3 +277,5 @@ function send(socket: WebSocket, message: GameServerMessage): void {
 }
 
 const isMember = (player: SeatedPlayer) => player.member !== false;
+
+const resultPlayer = (player: SeatedPlayer): ResultPlayer => ({ id: player.id, name: player.username, guest: !isMember(player) });

@@ -46,6 +46,7 @@ export interface PlayerInfo {
   readonly username: string;
   /** 게스트는 없음(레이팅은 회원만 쌓임) */
   readonly rating?: number;
+  readonly guest?: boolean;
   readonly ratingChange?: number;
 }
 
@@ -77,6 +78,18 @@ export interface LeaderboardEntry {
   readonly username: string;
   readonly rating: number;
   readonly games: number;
+}
+
+/** 이번 주 랭킹 한 줄(게스트 포함) · 승점 = 승 1 · 무 0.5 */
+export interface WeeklyEntry {
+  readonly rank: number;
+  readonly username: string;
+  readonly guest: boolean;
+  readonly points: number;
+  readonly games: number;
+  readonly wins: number;
+  /** 보고 있는 사람 본인 */
+  readonly mine: boolean;
 }
 
 /** 봇 대국 한 판에 쓸 수 있는 힌트·무르기 수(누구나 같음) */

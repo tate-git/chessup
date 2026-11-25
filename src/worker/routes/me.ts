@@ -9,6 +9,8 @@ import { findUserById, findUserByName, type UserRow } from '../db/users';
 import type { AppEnv } from '../env';
 import { notFound, unauthorized } from '../errors';
 import { requireUser } from '../middleware';
+import { findPlayer } from '../auth/guest';
+import { koreaWeekStart, weeklyLeaderboard } from '../db/weekly';
 import { parseQuery } from '../validation';
 
 const BEGINNER_GAME_LIMIT = 20;
@@ -36,6 +38,12 @@ export const userRoutes = new Hono<AppEnv>()
     const [ratings, games] = await Promise.all([loadRatings(context.env.DB, user.id), recentGames(context.env.DB, user.id)]);
     const profile: Profile = { username: user.username, createdAt: user.created_at, ratings: toRatingsView(ratings), recentGames: games.map(toSummary) };
     return context.json(profile);
+  })
+  .get('/leaderboard/weekly', async context => {
+    const { variant, limit } = parseQuery(context, leaderboardQuery);
+    const viewer = await findPlayer(context);
+    const weekStart = koreaWeekStart();
+    return context.json({ variant, weekStart, entries: await weeklyLeaderboard(context.env.DB, variant, weekStart, viewer?.id ?? null, limit) });
   })
   .get('/leaderboard', async context => {
     const { variant, limit } = parseQuery(context, leaderboardQuery);

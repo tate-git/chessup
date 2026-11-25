@@ -7,6 +7,7 @@ package com.chessup.db;
 import com.chessup.db.tables.Games;
 import com.chessup.db.tables.HintUses;
 import com.chessup.db.tables.LoginFailures;
+import com.chessup.db.tables.MatchResults;
 import com.chessup.db.tables.PracticeClears;
 import com.chessup.db.tables.Ratings;
 import com.chessup.db.tables.Sessions;
@@ -50,6 +51,11 @@ public class Public extends SchemaImpl {
     public final LoginFailures LOGIN_FAILURES = LoginFailures.LOGIN_FAILURES;
 
     /**
+     * The table <code>public.match_results</code>.
+     */
+    public final MatchResults MATCH_RESULTS = MatchResults.MATCH_RESULTS;
+
+    /**
      * The table <code>public.practice_clears</code>.
      */
     public final PracticeClears PRACTICE_CLEARS = PracticeClears.PRACTICE_CLEARS;
@@ -88,6 +94,7 @@ public class Public extends SchemaImpl {
             Games.GAMES,
             HintUses.HINT_USES,
             LoginFailures.LOGIN_FAILURES,
+            MatchResults.MATCH_RESULTS,
             PracticeClears.PRACTICE_CLEARS,
             Ratings.RATINGS,
             Sessions.SESSIONS,

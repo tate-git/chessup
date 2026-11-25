@@ -59,6 +59,9 @@ button, a.button {
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+/* 「게스트」 같은 작은 꼬리표 */
+.tag { display: inline-block; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); vertical-align: middle; }
+.guest-name { display: grid; gap: 8px; & input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); } & .error { margin: 0; min-height: 1em; color: #d6336c; } }
 
 /* ───────── 홈 */
 .home {
@@ -446,6 +449,7 @@ dialog {
   & li { display: grid; grid-template-columns: 36px 1fr auto 56px; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: center; }
   & li:last-child { border-bottom: 0; }
   & li.mine { color: var(--accent); font-weight: 600; }
+  & .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   & .rank { color: var(--muted); }
   & b { text-align: right; }
 }
