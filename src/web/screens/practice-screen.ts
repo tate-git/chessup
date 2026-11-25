@@ -27,14 +27,16 @@ export const practiceScreen = (level: number): Screen => async root => {
       <div class="table">
         <div class="board-wrap"><div id="board"></div></div>
         <aside class="side">
-          <p id="status" class="status"></p>
-          <ol id="moves" class="moves"></ol>
-          <div class="controls">
-            <button type="button" id="hint"></button>
-            <button type="button" id="undo"></button>
-            <button type="button" data-action="flip">🔄 ${t('뒤집기', 'Flip')}</button>
-            <button type="button" data-action="resign">🏳️ ${t('기권', 'Resign')}</button>
+          <div class="toolbar">
+            <p id="status" class="status"></p>
+            <div class="controls">
+              <button type="button" id="hint"></button>
+              <button type="button" id="undo"></button>
+              <button type="button" data-action="flip">🔄 ${t('뒤집기', 'Flip')}</button>
+              <button type="button" data-action="resign">🏳️ ${t('기권', 'Resign')}</button>
+            </div>
           </div>
+          <ol id="moves" class="moves"></ol>
         </aside>
       </div>
       <dialog id="result" class="result"></dialog>

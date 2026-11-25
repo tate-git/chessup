@@ -222,6 +222,15 @@ a.button.wide { display: block; }
 }
 
 .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 연습 화면: 상태 · 힌트 · 무르기 · 뒤집기 · 기권을 세로 한 줄로 */
+.toolbar {
+  display: grid;
+  gap: 8px;
+
+  & .controls { display: grid; gap: 8px; }
+  & .controls button { width: 100%; }
+}
 .controls[hidden] { display: none; }
 
 /* ───────── 판 */
