@@ -191,7 +191,7 @@ export const homeScreen: Screen = async root => {
         roomCode = code;
         waitDialog('🔑', t('방을 만들었어요 · 방 번호', 'Room created · number'),
           `<p class="room-code">${code}</p>
-           <p class="muted">${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)} · ${t('친구가 번호를 넣거나 링크를 누르면 바로 시작해요', 'Starts as soon as a friend enters the number or opens the link')}</p>
+           <p class="muted">${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)}</p>
            <button type="button" class="primary wide" data-action="share-room">🔗 ${t('링크 공유', 'Share link')}</button>
            <p class="muted small room-link">${roomLink(code)}</p>`);
         query(dialog, '#seek-info').textContent = t('친구를 기다리는 중…', 'Waiting for your friend…');
