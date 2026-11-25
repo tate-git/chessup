@@ -8,7 +8,7 @@ import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
 import { escapeHtml, query } from '../ui/dom';
 import { mountLevelWheel } from '../ui/level-wheel';
-import { ratingText, variantLabel } from './labels';
+import { ratingText, timeControlHint, timeControlLabel, variantLabel } from './labels';
 import { navigate, type Screen } from './screen';
 
 const COLOR_CHOICES: readonly ColorChoice[] = ['white', 'black', 'random'];
@@ -75,7 +75,7 @@ export const homeScreen: Screen = async root => {
     return `<article class="card ranked">
       <h2>⚔️ ${t('대국', 'Play')}${heading}</h2>
       <p class="muted">${intro}</p>
-      <div class="time-controls">${TIME_CONTROLS[variant].map(tc => `<button type="button" class="primary" data-seek="${tc}">⏱ ${tc}</button>`).join('')}</div>
+      <div class="time-controls">${TIME_CONTROLS[variant].map(tc => `<button type="button" class="primary" data-seek="${tc}" title="${timeControlHint(tc)}">⏱ ${timeControlLabel(tc)}</button>`).join('')}</div>
       <div class="room-row">
         <button type="button" data-action="room">🔑 ${t('방 만들기', 'Create room')}</button>
         <form class="join-room" novalidate>
@@ -105,7 +105,7 @@ export const homeScreen: Screen = async root => {
 
   const startSeeking = async (timeControl: TimeControl) => {
     const guestName = await ensurePlayer();
-    const label = `${variantLabel(settings.variant)} · ${timeControl}${guestName ? ` · ${guestName}` : ''}`;
+    const label = `${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)}${guestName ? ` · ${guestName}` : ''}`;
     const dialog = waitDialog('🔎', t('상대를 찾는 중…', 'Finding an opponent…'), '');
     query(dialog, '#seek-info').textContent = label;
     cancelSeek = seek(settings.variant, timeControl, {
@@ -119,7 +119,7 @@ export const homeScreen: Screen = async root => {
   const chooseRoomTime = () => {
     waitDialog('🔑', t('방 만들기', 'Create a room'),
       `<p class="muted">${variantLabel(settings.variant)} · ${t('시간을 고르세요', 'Pick a time control')}</p>
-       <div class="time-controls">${TIME_CONTROLS[settings.variant].map(tc => `<button type="button" class="primary" data-room-time="${tc}">⏱ ${tc}</button>`).join('')}</div>`);
+       <div class="time-controls">${TIME_CONTROLS[settings.variant].map(tc => `<button type="button" class="primary" data-room-time="${tc}" title="${timeControlHint(tc)}">⏱ ${timeControlLabel(tc)}</button>`).join('')}</div>`);
   };
 
   const openRoom = async (timeControl: TimeControl) => {
@@ -130,7 +130,7 @@ export const homeScreen: Screen = async root => {
         roomCode = code;
         waitDialog('🔑', t('방을 만들었어요 · 방 번호', 'Room created · number'),
           `<p class="room-code">${code}</p>
-           <p class="muted">${variantLabel(settings.variant)} · ${timeControl} · ${t('친구가 번호를 넣거나 링크를 누르면 바로 시작해요', 'Starts as soon as a friend enters the number or opens the link')}</p>
+           <p class="muted">${variantLabel(settings.variant)} · ${timeControlLabel(timeControl)} · ${t('친구가 번호를 넣거나 링크를 누르면 바로 시작해요', 'Starts as soon as a friend enters the number or opens the link')}</p>
            <button type="button" class="primary wide" data-action="share-room">🔗 ${t('링크 공유', 'Share link')}</button>
            <p class="muted small room-link">${roomLink(code)}</p>`);
         query(dialog, '#seek-info').textContent = t('친구를 기다리는 중…', 'Waiting for your friend…');

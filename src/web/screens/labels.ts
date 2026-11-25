@@ -1,8 +1,26 @@
 // 화면 글자 모음
-import type { EndReason, VariantId } from '../../shared/protocol';
+import { parseTimeControl, type EndReason, type TimeControl, type VariantId } from '../../shared/protocol';
 import { t } from '../i18n';
 
 export const variantLabel = (variant: VariantId) => (variant === 'standard' ? t('정통 체스', 'Chess') : t('미니 체스 6×6', 'Mini chess 6×6'));
+
+/** 「3+2」 → 「3분 +2초」(처음 시간 + 한 수마다 더하는 시간) · 더하는 시간이 없으면 「10분」 */
+export function timeControlLabel(timeControl: TimeControl): string {
+  const { initialMs, incrementMs } = parseTimeControl(timeControl);
+  const minutes = initialMs / 60_000;
+  const seconds = incrementMs / 1_000;
+  return seconds === 0 ? t(`${minutes}분`, `${minutes} min`) : t(`${minutes}분 +${seconds}초`, `${minutes} min +${seconds}s`);
+}
+
+/** 시간 버튼에 마우스를 올리면 나오는 설명 */
+export function timeControlHint(timeControl: TimeControl): string {
+  const { initialMs, incrementMs } = parseTimeControl(timeControl);
+  const minutes = initialMs / 60_000;
+  const seconds = incrementMs / 1_000;
+  return seconds === 0
+    ? t(`각자 ${minutes}분 · 더해지는 시간 없음`, `${minutes} minutes each · no increment`)
+    : t(`각자 ${minutes}분으로 시작 · 한 수 둘 때마다 ${seconds}초씩 더해져요`, `${minutes} minutes each · +${seconds}s per move`);
+}
 
 export function endReasonLabel(reason: EndReason): string {
   const labels: Record<EndReason, () => string> = {

@@ -4,7 +4,7 @@ import { t } from '../i18n';
 import { LiveSession } from '../live-session';
 import { session } from '../session';
 import { query } from '../ui/dom';
-import { endReasonLabel, variantLabel } from './labels';
+import { endReasonLabel, timeControlLabel, variantLabel } from './labels';
 import type { Screen } from './screen';
 
 export const liveScreen = (gameId: string): Screen => root => {
@@ -59,7 +59,7 @@ export const liveScreen = (gameId: string): Screen => root => {
 };
 
 function showResult(root: HTMLElement, summary: GameSummary, you: Color | 'spectator'): void {
-  query(root, '#title').textContent = `⚔️ ${variantLabel(summary.variant)} · ${summary.timeControl}`;
+  query(root, '#title').textContent = `⚔️ ${variantLabel(summary.variant)} · ${timeControlLabel(summary.timeControl)}`;
   const winner: Color | null = summary.result === '1-0' ? 'white' : summary.result === '0-1' ? 'black' : null;
   const headline = you === 'spectator' ? summary.result : winner === null ? t('무승부', 'Draw') : winner === you ? t('승리!', 'You win!') : t('패배', 'You lost');
   const mine = you === 'spectator' ? undefined : summary[you];
