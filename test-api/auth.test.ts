@@ -45,20 +45,25 @@ describe('회원가입·로그인', () => {
 });
 
 describe('연습·힌트', () => {
-  it('초보는 한 판에 힌트 1번 · 다른 판이면 다시 1번', async () => {
+  it('힌트는 한 판에 3번 · 다른 판이면 다시 3번', async () => {
     const user = TestUser.fresh();
     await user.signup();
-    expect((await user.request('POST', '/api/practice/hints', { practiceGameId: 'g1' })).json).toEqual({ remaining: 0, scope: 'game' });
+    const remaining = [];
+    for (let use = 0; use < 3; use++) remaining.push((await user.request('POST', '/api/practice/hints', { practiceGameId: 'g1' })).json.remaining);
+    expect(remaining).toEqual([2, 1, 0]);
     expect((await user.request('POST', '/api/practice/hints', { practiceGameId: 'g1' })).json.error.code).toBe('no_hints_left');
-    expect((await user.request('POST', '/api/practice/hints', { practiceGameId: 'g2' })).status).toBe(200);
+    expect((await user.request('POST', '/api/practice/hints', { practiceGameId: 'g2' })).json).toEqual({ remaining: 2 });
   });
 
-  it('봇 격파 기록은 최고 단계만 남음', async () => {
+  it('봇 격파 기록은 최고 단계만 남음 · 도움 받고 깨면 「도움 없이」 단계는 그대로', async () => {
     const user = TestUser.fresh();
     await user.signup();
     await user.request('POST', '/api/practice/clears', { variant: 'mini', level: 4 });
-    const state = await user.request('POST', '/api/practice/clears', { variant: 'mini', level: 2 });
-    expect(state.json.cleared).toEqual({ standard: 0, mini: 4 });
+    await user.request('POST', '/api/practice/clears', { variant: 'mini', level: 2 });
+    const helped = await user.request('POST', '/api/practice/clears', { variant: 'mini', level: 6, assisted: true });
+    expect(helped.json).toEqual({ cleared: { standard: 0, mini: 6 }, unassisted: { standard: 0, mini: 4 } });
+    const alone = await user.request('POST', '/api/practice/clears', { variant: 'mini', level: 6 });
+    expect(alone.json.unassisted).toEqual({ standard: 0, mini: 6 });
   });
 
   it('로그인 안 하면 401', async () => {

@@ -19,7 +19,9 @@ export const homeScreen: Screen = async root => {
     document.documentElement.lang = lang;
     document.title = t('체스업', 'Chessup');
     const variant = settings.variant;
-    const cleared = (await loadCleared())[variant];
+    const progress = await loadCleared();
+    const cleared = progress.cleared[variant];
+    const unassisted = progress.unassisted[variant];
     root.innerHTML = `
       <section class="home">
         <nav class="topnav">
@@ -38,12 +40,12 @@ export const homeScreen: Screen = async root => {
         ${rankedCard(variant)}
         <article class="card">
           <h2>🤖 ${t('봇과 연습', 'Practice with bots')}</h2>
-          <p class="muted">${t('1단부터 10단까지 · 이긴 단계는 ✓ · 레이팅과 무관 · 힌트는 봇 대국에서만', 'Levels 1–10 · cleared levels get ✓ · unrated · hints only vs bots')}</p>
+          <p class="muted">${t('1단부터 10단까지 · 레이팅과 무관 · 힌트·무르기 한 판 3번씩 · 이긴 단계 ✓ · 도움 받아 이기면 🤝', 'Levels 1–10 · unrated · 3 hints and 3 undos per game · cleared ✓ · with help 🤝')}</p>
           <div class="segmented small">
             ${COLOR_CHOICES.map(choice => `<button type="button" aria-selected="${choice === settings.color}" data-color="${choice}">${colorLabel(choice)}</button>`).join('')}
           </div>
           <div class="levels">
-            ${BOT_LEVELS.map(({ level }) => `<a class="button level ${level <= cleared ? 'cleared' : ''} ${level === cleared + 1 ? 'next' : ''}" href="#/practice/${level}">${level}${t('단', '')}${level <= cleared ? ' ✓' : ''}</a>`).join('')}
+            ${BOT_LEVELS.map(({ level }) => `<a class="button level ${level <= cleared ? 'cleared' : ''} ${level === cleared + 1 ? 'next' : ''}" href="#/practice/${level}">${level}${t('단', '')}${clearMark(level, cleared, unassisted)}</a>`).join('')}
           </div>
         </article>
         <footer class="credits">${t('말 그림', 'Pieces')}: Colin M.L. Burnett (BSD/GPL/CC BY-SA)</footer>
@@ -106,3 +108,9 @@ export const homeScreen: Screen = async root => {
   await render();
   return stopSeeking;
 };
+
+/** 도움 없이 깬 단계 ✓ · 힌트·무르기로만 깬 단계 ✓🤝 */
+function clearMark(level: number, cleared: number, unassisted: number): string {
+  if (level <= unassisted) return ' ✓';
+  return level <= cleared ? ' ✓🤝' : '';
+}

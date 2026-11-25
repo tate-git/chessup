@@ -103,7 +103,7 @@ paths:
   /api/practice:
     get:
       tags: [practice]
-      summary: 봇 연습 기록 · 남은 힌트
+      summary: 봇 격파 기록(깬 최고 단계 · 도움 없이 깬 최고 단계)
       security: [{ cookieAuth: [] }]
       responses:
         '200': { description: 연습 기록, content: { application/json: { schema: { $ref: '#/components/schemas/PracticeState' } } } }
@@ -124,6 +124,7 @@ paths:
               properties:
                 variant: { $ref: '#/components/schemas/VariantId' }
                 level: { type: integer, minimum: 1, maximum: 10 }
+                assisted: { type: boolean, default: false, description: 힌트·무르기를 썼는지(쓰면 도움 없이 깬 단계는 그대로) }
       responses:
         '200': { description: 갱신된 기록, content: { application/json: { schema: { $ref: '#/components/schemas/PracticeState' } } } }
         '400': { $ref: '#/components/responses/InvalidInput' }
@@ -132,7 +133,7 @@ paths:
   /api/practice/hints:
     post:
       tags: [practice]
-      summary: 힌트 한 번 쓰기(초보 = 사람 대국 20판 미만 → 한 판 1번 · 그 외 하루 1번(한국 시간))
+      summary: 힌트 한 번 쓰기(누구나 한 판 3번 · 무르기 3번은 화면에서만 셈)
       security: [{ cookieAuth: [] }]
       requestBody:
         required: true
@@ -142,11 +143,11 @@ paths:
               type: object
               required: [practiceGameId]
               properties:
-                practiceGameId: { type: string, description: 화면이 만든 연습 판 id(초보 한 판 1번 세기용), maxLength: 64 }
+                practiceGameId: { type: string, description: 화면이 만든 연습 판 id(판마다 3번 세기용), maxLength: 64 }
       responses:
         '200': { description: 사용 · 남은 수, content: { application/json: { schema: { $ref: '#/components/schemas/HintAllowance' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '429': { description: 남은 힌트 없음, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
+        '429': { description: 이 판의 힌트를 다 씀, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorBody' } } } }
 
   /api/games/{id}:
     get:
@@ -266,21 +267,21 @@ components:
 
     HintAllowance:
       type: object
-      required: [remaining, scope]
+      required: [remaining]
       properties:
-        remaining: { type: integer, minimum: 0 }
-        scope: { type: string, enum: [game, day], description: 'game = 초보(한 판 1번) · day = 하루 1번' }
+        remaining: { type: integer, minimum: 0, maximum: 3, description: 이 판에 남은 힌트 }
+    ClearLevels:
+      type: object
+      required: [standard, mini]
+      properties:
+        standard: { type: integer, minimum: 0, maximum: 10 }
+        mini: { type: integer, minimum: 0, maximum: 10 }
     PracticeState:
       type: object
-      required: [cleared, hints]
+      required: [cleared, unassisted]
       properties:
-        cleared:
-          type: object
-          required: [standard, mini]
-          properties:
-            standard: { type: integer, minimum: 0, maximum: 10 }
-            mini: { type: integer, minimum: 0, maximum: 10 }
-        hints: { $ref: '#/components/schemas/HintAllowance' }
+        cleared: { $ref: '#/components/schemas/ClearLevels', description: 깬 최고 단계(힌트·무르기 써도 포함) }
+        unassisted: { $ref: '#/components/schemas/ClearLevels', description: 힌트·무르기 없이 깬 최고 단계 · cleared 보다 낮은 단계는 화면에 🤝 }
 
     PlayerInfo:
       type: object

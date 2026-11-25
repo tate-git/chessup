@@ -37,6 +37,6 @@ export const api = {
   profile: (username: string) => call<Profile>('GET', `/api/users/${encodeURIComponent(username)}`),
   game: (id: string) => call<GameRecord>('GET', `/api/games/${encodeURIComponent(id)}`),
   practice: () => call<PracticeState>('GET', '/api/practice'),
-  recordClear: (variant: VariantId, level: number) => call<PracticeState>('POST', '/api/practice/clears', { variant, level }),
+  recordClear: (variant: VariantId, level: number, assisted: boolean) => call<PracticeState>('POST', '/api/practice/clears', { variant, level, assisted }),
   useHint: (practiceGameId: string) => call<HintAllowance>('POST', '/api/practice/hints', { practiceGameId }),
 };

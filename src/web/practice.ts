@@ -1,5 +1,6 @@
-// 봇과 연습: 내가 두면 → 봇이 생각해서 둠 → 끝나면 결과 · 힌트 · 판 뒤집기 · 기권
+// 봇과 연습: 내가 두면 → 봇이 생각해서 둠 → 끝나면 결과 · 힌트·무르기(한 판 3번씩) · 판 뒤집기 · 기권
 import { Game, opponent, PAWN, typeOf, WHITE, winnerOf, type GameStatus, type Side, type VariantId } from '../engine';
+import { UNDOS_PER_GAME } from '../shared/protocol';
 import { engine } from './engine-client';
 import { t } from './i18n';
 import type { HintSource } from './hints';
@@ -15,6 +16,7 @@ export interface PracticeSetup {
   readonly level: number;
   readonly playerSide: Side;
   readonly clearedBefore: number;
+  readonly unassistedBefore: number;
   readonly hints: HintSource;
 }
 
@@ -23,13 +25,18 @@ export interface PracticeView {
   readonly status: HTMLElement;
   readonly moves: HTMLElement;
   readonly hintButton: HTMLButtonElement;
+  readonly undoButton: HTMLButtonElement;
   readonly onFinish: (outcome: PracticeOutcome) => void;
 }
 
 export interface PracticeOutcome {
   readonly status: Extract<GameStatus, { over: true }> | { over: true; result: '1-0' | '0-1'; reason: 'resign' };
   readonly won: boolean;
+  /** 힌트나 무르기를 한 번이라도 썼는지 */
+  readonly assisted: boolean;
   readonly newClear: boolean;
+  /** 도움 없이는 처음 깸(전에 도움 받고 깬 단계 포함) */
+  readonly newUnassistedClear: boolean;
 }
 
 export class PracticeSession {
@@ -38,6 +45,8 @@ export class PracticeSession {
   #orientation: Side;
   #botThinking = false;
   #finished = false;
+  #undosLeft = UNDOS_PER_GAME;
+  #assisted = false;
 
   constructor(readonly setup: PracticeSetup, private readonly view: PracticeView) {
     this.game = new Game(setup.variant);
@@ -59,10 +68,22 @@ export class PracticeSession {
 
   async hint(): Promise<void> {
     if (!this.#isPlayerTurn() || !(await this.setup.hints.use())) return;
-    this.#updateHintButton();
+    this.#assisted = true;
+    this.#updateButtons();
     const uci = await engine.hint(this.setup.variant, this.game.position.toFen());
     const move = uci ? this.game.findMove(uci) : undefined;
     if (move) this.#board.showArrow(move);
+  }
+
+  /** 봇의 마지막 수와 내 마지막 수를 되돌려 다시 내 차례로 */
+  undo(): void {
+    if (!this.#canUndo()) return;
+    this.game.undo();
+    this.game.undo();
+    this.#undosLeft -= 1;
+    this.#assisted = true;
+    this.#board.showArrow(null);
+    this.#refresh();
   }
 
   resign(): void {
@@ -72,6 +93,12 @@ export class PracticeSession {
 
   #isPlayerTurn(): boolean {
     return !this.#finished && !this.#botThinking && this.game.turn === this.setup.playerSide;
+  }
+
+  /** 내 차례이고, 되돌릴 내 수가 있을 때(흑이면 봇의 첫수는 남김) */
+  #canUndo(): boolean {
+    const firstMine = this.setup.playerSide === WHITE ? 0 : 1;
+    return this.#undosLeft > 0 && this.#isPlayerTurn() && this.game.history.length >= firstMine + 2;
   }
 
   async #playerMove(from: number, to: number): Promise<void> {
@@ -110,10 +137,13 @@ export class PracticeSession {
   #finish(status: PracticeOutcome['status']): void {
     this.#finished = true;
     this.#refresh();
+    const { level } = this.setup;
     const won = winnerOf(status.result) === this.setup.playerSide;
-    const newClear = won && this.setup.level > this.setup.clearedBefore;
-    if (won) void recordClear(this.setup.variant, this.setup.level);
-    this.view.onFinish({ status, won, newClear });
+    const assisted = this.#assisted;
+    const newClear = won && level > this.setup.clearedBefore;
+    const newUnassistedClear = won && !assisted && level > this.setup.unassistedBefore;
+    if (won) void recordClear(this.setup.variant, level, assisted);
+    this.view.onFinish({ status, won, assisted, newClear, newUnassistedClear });
   }
 
   #refresh(): void {
@@ -129,14 +159,18 @@ export class PracticeSession {
     this.view.status.textContent = this.#finished ? t('대국 끝', 'Game over') : this.#botThinking ? t('🤖 생각 중…', '🤖 Thinking…') : t('내 차례', 'Your move');
     this.view.moves.innerHTML = moveListHtml(this.game.history.map(played => played.san));
     this.view.moves.scrollTop = this.view.moves.scrollHeight;
-    this.#updateHintButton();
+    this.#updateButtons();
   }
 
-  #updateHintButton(): void {
-    const { remaining, scope } = this.setup.hints.allowance;
-    this.view.hintButton.disabled = remaining <= 0 || !this.#isPlayerTurn();
-    this.view.hintButton.textContent = `💡 ${t('힌트', 'Hint')} ${Math.max(0, remaining)}`;
-    this.view.hintButton.title = scope === 'game' ? t('초보: 한 판에 1번', 'Beginner: 1 per game') : t('하루 1번', '1 per day');
+  #updateButtons(): void {
+    const hints = this.setup.hints.remaining;
+    this.view.hintButton.disabled = hints <= 0 || !this.#isPlayerTurn();
+    this.view.hintButton.textContent = `💡 ${t('힌트', 'Hint')} ${Math.max(0, hints)}`;
+    this.view.undoButton.disabled = !this.#canUndo();
+    this.view.undoButton.textContent = `↩️ ${t('무르기', 'Undo')} ${this.#undosLeft}`;
+    const note = t('한 판에 3번 · 쓰고 이기면 격파에 🤝 표시', '3 per game · wins using it are marked 🤝');
+    this.view.hintButton.title = note;
+    this.view.undoButton.title = note;
   }
 
 }

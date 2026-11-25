@@ -78,14 +78,20 @@ export interface LeaderboardEntry {
   readonly games: number;
 }
 
+/** 봇 대국 한 판에 쓸 수 있는 힌트·무르기 수(누구나 같음) */
+export const HINTS_PER_GAME = 3;
+export const UNDOS_PER_GAME = 3;
+
 export interface HintAllowance {
+  /** 이 판에 남은 힌트 */
   readonly remaining: number;
-  readonly scope: 'game' | 'day';
 }
 
 export interface PracticeState {
+  /** 깬 최고 단계(힌트·무르기 써도 포함) */
   readonly cleared: Readonly<Record<VariantId, number>>;
-  readonly hints: HintAllowance;
+  /** 힌트·무르기 없이 깬 최고 단계 */
+  readonly unassisted: Readonly<Record<VariantId, number>>;
 }
 
 // ───────── WebSocket 글

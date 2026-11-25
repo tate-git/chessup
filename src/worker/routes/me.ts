@@ -11,7 +11,7 @@ import { notFound, unauthorized } from '../errors';
 import { requireUser } from '../middleware';
 import { parseQuery } from '../validation';
 
-export const BEGINNER_GAME_LIMIT = 20;
+const BEGINNER_GAME_LIMIT = 20;
 const LEADERBOARD_MIN_GAMES = 10;
 
 export async function meOf(db: D1Database, user: Pick<UserRow, 'id' | 'username' | 'created_at'>): Promise<Me> {

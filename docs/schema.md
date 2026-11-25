@@ -9,8 +9,8 @@ Cloudflare 는 D1(SQLite) — `migrations/*.sql`, Spring Boot 는 PostgreSQL —
 | sessions | token_hash(PK, SHA-256) · user_id · created_at · expires_at | 로그인 세션(쿠키엔 원래 토큰, DB엔 해시만) |
 | ratings | user_id · variant · rating · deviation · volatility · games · wins · losses · draws · updated_at | 종목별 Glicko-2 |
 | games | id · variant · time_control · white_id · black_id · result · reason · moves(UCI 공백 구분) · white_rating · black_rating · white_change · black_change · started_at · ended_at | 끝난 사람 대국 |
-| practice_clears | user_id · variant · level | 봇 격파 최고 단계 |
-| hint_uses | user_id · day(한국 날짜) · practice_game_id · used_at | 힌트 쓴 기록(하루·한 판 세기) |
+| practice_clears | user_id · variant · level · unassisted_level | 봇 격파 최고 단계 · 힌트·무르기 없이 깬 최고 단계 |
+| hint_uses | user_id · day(한국 날짜) · practice_game_id · used_at | 힌트 쓴 기록(한 판 3번 세기 · day 는 통계용) |
 | login_failures | key(아이디 또는 IP) · window_start · count | 로그인 실패 제한(15분 창: 아이디 10번 · IP 50번) |
 
 ## 비밀번호
