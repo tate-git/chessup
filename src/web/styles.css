@@ -140,6 +140,18 @@ button, a.button {
   &.soon { opacity: 0.7; }
 }
 
+/* 휠 아래 가운데 고정 화살표(룰렛 바늘) — 휠이 움직여도 제자리 */
+.wheel-frame { margin-bottom: 12px; min-width: 0; }   /* 카드(그리드) 안에서 휠 폭이 내용만큼 늘어나지 않게 */
+.wheel-pointer {
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 2px auto 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 12px solid var(--ink);
+}
+
 .level-wheel {
   /* 봇 단계 가로 휠: 가운데 칸이 선택 · 양 끝은 흐리게 */
   display: flex;
@@ -148,7 +160,6 @@ button, a.button {
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   padding: 8px calc(50% - 36px);   /* 1단·10단도 가운데로 올 수 있게 */
-  margin-bottom: 12px;
   mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
 
   &::-webkit-scrollbar { display: none; }

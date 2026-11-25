@@ -58,7 +58,10 @@ export const homeScreen: Screen = async root => {
           <div class="segmented small">
             ${COLOR_CHOICES.map(choice => `<button type="button" aria-selected="${choice === settings.color}" data-color="${choice}">${colorLabel(choice)}</button>`).join('')}
           </div>
-          <div class="level-wheel"></div>
+          <div class="wheel-frame">
+            <div class="level-wheel"></div>
+            <span class="wheel-pointer" aria-hidden="true"></span>
+          </div>
           <a class="button primary wide" id="start-practice" href="#/practice/1"></a>
         </article>
         <footer class="credits">${t('말 그림', 'Pieces')}: Colin M.L. Burnett (BSD/GPL/CC BY-SA)</footer>
