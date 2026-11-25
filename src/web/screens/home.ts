@@ -41,7 +41,7 @@ export const homeScreen: Screen = async root => {
         ${rankedCard(variant)}
         <article class="card">
           <h2>🤖 ${t('봇과 연습', 'Practice with bots')}</h2>
-          <p class="muted">${t('1단부터 10단까지 · 레이팅과 무관 · 힌트·무르기 한 판 3번씩 · 이긴 단계 ✓ · 도움 받아 이기면 🤝', 'Levels 1–10 · unrated · 3 hints and 3 undos per game · cleared ✓ · with help 🤝')}</p>
+          <p class="muted">${t('1단~10단까지 실력을 키워요.', 'Build your skills from level 1 to 10.')}</p>
           <div class="segmented small">
             ${COLOR_CHOICES.map(choice => `<button type="button" aria-selected="${choice === settings.color}" data-color="${choice}">${colorLabel(choice)}</button>`).join('')}
           </div>
