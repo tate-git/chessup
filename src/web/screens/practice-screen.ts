@@ -27,7 +27,7 @@ export const practiceScreen = (level: number): Screen => async root => {
       <div class="table practice">
         <div class="board-stack">
           <div class="board-wrap"><div id="board"></div></div>
-          <p id="status" class="status"></p>
+          <p id="status" class="sr-only" aria-live="polite"></p>
           <div class="board-actions">
             <button type="button" id="hint"></button>
             <button type="button" id="undo"></button>
