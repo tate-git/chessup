@@ -7,6 +7,7 @@ import { seek } from '../lobby-client';
 import { loadCleared } from '../practice-record';
 import { session, settings, type ColorChoice } from '../session';
 import { escapeHtml, query } from '../ui/dom';
+import { mountLevelWheel } from '../ui/level-wheel';
 import { ratingText, variantLabel } from './labels';
 import { navigate, type Screen } from './screen';
 
@@ -25,8 +26,8 @@ export const homeScreen: Screen = async root => {
     root.innerHTML = `
       <section class="home">
         <nav class="topnav">
-          <a href="#/leaderboard">🏆 ${t('랭킹', 'Leaderboard')}</a>
-          ${session.me ? `<span class="me">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
+          <a href="#/leaderboard">🏆 ${t('랭킹', 'Ranking')}</a>
+          ${session.me ? `<span class="me" title="${escapeHtml(session.me.username)}">👤 <b>${escapeHtml(session.me.username)}</b></span><button type="button" data-action="logout" class="ghost">${t('로그아웃', 'Log out')}</button>` : `<a href="#/login" class="login-link">${t('로그인', 'Log in')}</a>`}
           <button type="button" data-action="lang" class="ghost">${t('🌐 English', '🌐 한국어')}</button>
         </nav>
         <header class="hero">
@@ -44,13 +45,22 @@ export const homeScreen: Screen = async root => {
           <div class="segmented small">
             ${COLOR_CHOICES.map(choice => `<button type="button" aria-selected="${choice === settings.color}" data-color="${choice}">${colorLabel(choice)}</button>`).join('')}
           </div>
-          <div class="levels">
-            ${BOT_LEVELS.map(({ level }) => `<a class="button level ${level <= cleared ? 'cleared' : ''} ${level === cleared + 1 ? 'next' : ''}" href="#/practice/${level}">${level}${t('단', '')}${clearMark(level, cleared, unassisted)}</a>`).join('')}
-          </div>
+          <div class="level-wheel"></div>
+          <a class="button primary wide" id="start-practice" href="#/practice/1"></a>
         </article>
         <footer class="credits">${t('말 그림', 'Pieces')}: Colin M.L. Burnett (BSD/GPL/CC BY-SA)</footer>
       </section>
       <dialog id="seeking" class="result"></dialog>`;
+    mountLevelWheel(
+      query(root, '.level-wheel'),
+      BOT_LEVELS.map(({ level }) => ({ level, label: `${level}${t('단', '')}`, mark: clearMark(level, cleared, unassisted) })),
+      Math.min(cleared + 1, BOT_LEVELS.length),
+      level => {
+        const start = query<HTMLAnchorElement>(root, '#start-practice');
+        start.href = `#/practice/${level}`;
+        start.textContent = t(`${level}단 도전하기`, `Play level ${level}`);
+      },
+    );
   };
 
   const rankedCard = (variant: VariantId) => {
@@ -91,7 +101,7 @@ export const homeScreen: Screen = async root => {
 
   root.onclick = async event => {
     const button = (event.target as HTMLElement).closest<HTMLElement>('button');
-    if (!button) return;
+    if (!button || button.closest('.level-wheel')) return;   // 휠은 스스로 처리(다시 그리면 위치가 처음으로 감)
     const { action, variant, color, seek: timeControl } = button.dataset;
     if (variant) settings.variant = variant as VariantId;
     if (color) settings.color = color as ColorChoice;
@@ -111,6 +121,6 @@ export const homeScreen: Screen = async root => {
 
 /** 도움 없이 깬 단계 ✓ · 힌트·무르기로만 깬 단계 ✓🤝 */
 function clearMark(level: number, cleared: number, unassisted: number): string {
-  if (level <= unassisted) return ' ✓';
-  return level <= cleared ? ' ✓🤝' : '';
+  if (level <= unassisted) return '✓';
+  return level <= cleared ? '✓🤝' : '';
 }
