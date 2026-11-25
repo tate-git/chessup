@@ -6,9 +6,7 @@ import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.not;
-import static org.jooq.impl.DSL.or;
 import static org.jooq.impl.DSL.row;
-import static org.jooq.impl.DSL.when;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -24,7 +22,7 @@ import org.jooq.SelectField;
 import org.jooq.impl.SQLDataType;
 import org.springframework.stereotype.Repository;
 
-import com.chessup.game.GameResult;
+import com.chessup.game.Perspective;
 import com.chessup.game.Variant;
 
 /** 내 전적 통계: 상대별 · 백/흑 · 날마다 레이팅 — 모두 「나」 기준으로 대국 표를 읽음 */
@@ -42,10 +40,10 @@ public class StatsRepository {
     /** 많이 둔 상대 순 */
     public List<OpponentRecord> byOpponent(UUID userId, Variant variant, int limit) {
         var me = new Perspective(userId);
-        return dsl.select(row(USERS.USERNAME, me.tally()).mapping(OpponentRecord::new))
+        return dsl.select(row(USERS.USERNAME, tally(me, noCondition())).mapping(OpponentRecord::new))
                 .from(GAMES)
                 .join(USERS).on(USERS.ID.eq(me.opponentId()))
-                .where(me.played(variant))
+                .where(me.played().and(GAMES.VARIANT.eq(variant)))
                 .groupBy(me.opponentId(), USERS.USERNAME)
                 .orderBy(count().desc(), USERS.USERNAME)
                 .limit(limit)
@@ -54,9 +52,9 @@ public class StatsRepository {
 
     public ColorRecord byColor(UUID userId, Variant variant) {
         var me = new Perspective(userId);
-        return dsl.select(me.tally(GAMES.WHITE_ID.eq(userId)), me.tally(GAMES.BLACK_ID.eq(userId)))
+        return dsl.select(tally(me, me.asWhite()), tally(me, not(me.asWhite())))
                 .from(GAMES)
-                .where(me.played(variant))
+                .where(me.played().and(GAMES.VARIANT.eq(variant)))
                 .fetchSingle(record -> new ColorRecord(record.value1(), record.value2()));
     }
 
@@ -69,52 +67,19 @@ public class StatsRepository {
         return dsl.selectDistinct(row(day, me.ratingAfter()).mapping(RatingPoint::new))
                 .on(day)
                 .from(GAMES)
-                .where(me.played(variant))
+                .where(me.played().and(GAMES.VARIANT.eq(variant)))
                 .and(GAMES.ENDED_AT.ge(since))
                 .orderBy(day, GAMES.ENDED_AT.desc())
                 .fetch(Record1::value1);
     }
 
-    /** 「나」 쪽에서 본 대국 칸·조건 */
-    private record Perspective(UUID userId) {
-
-        Condition asWhite() {
-            return GAMES.WHITE_ID.eq(userId);
-        }
-
-        Condition played(Variant variant) {
-            return or(GAMES.WHITE_ID.eq(userId), GAMES.BLACK_ID.eq(userId)).and(GAMES.VARIANT.eq(variant));
-        }
-
-        Field<UUID> opponentId() {
-            return when(asWhite(), GAMES.BLACK_ID).otherwise(GAMES.WHITE_ID);
-        }
-
-        Condition won() {
-            return asWhite().and(GAMES.RESULT.eq(GameResult.WHITE_WINS))
-                    .or(not(asWhite()).and(GAMES.RESULT.eq(GameResult.BLACK_WINS)));
-        }
-
-        Condition drew() {
-            return GAMES.RESULT.eq(GameResult.DRAW);
-        }
-
-        Field<Integer> ratingAfter() {
-            return when(asWhite(), GAMES.WHITE_RATING.plus(GAMES.WHITE_CHANGE)).otherwise(GAMES.BLACK_RATING.plus(GAMES.BLACK_CHANGE));
-        }
-
-        SelectField<Tally> tally() {
-            return tally(noCondition());
-        }
-
-        /** scope 에 맞는 판만 세기: count(*) FILTER (WHERE …) */
-        SelectField<Tally> tally(Condition scope) {
-            return row(
-                    count().filterWhere(scope),
-                    count().filterWhere(scope.and(won())),
-                    count().filterWhere(scope.and(drew())),
-                    count().filterWhere(scope.and(not(won())).and(not(drew()))))
-                    .mapping(Tally::new);
-        }
+    /** scope 에 맞는 판만 세기: count(*) FILTER (WHERE …) · 조건이 없으면 noCondition() 이라 FILTER 도 빠짐 */
+    private static SelectField<Tally> tally(Perspective me, Condition scope) {
+        return row(
+                count().filterWhere(scope),
+                count().filterWhere(scope.and(me.won())),
+                count().filterWhere(scope.and(me.drew())),
+                count().filterWhere(scope.and(me.lost())))
+                .mapping(Tally::new);
     }
 }
